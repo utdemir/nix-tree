@@ -1,0 +1,2 @@
+:def hoogle \x -> return $ ":! hoogle --count=15 \"" ++ x ++ "\""
+:def doc \x -> return $ ":!hoogle --info \"" ++ x ++ "\""
