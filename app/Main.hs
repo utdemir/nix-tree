@@ -238,6 +238,8 @@ selectedPath AppEnv {aeCurrPane} =
 main :: IO ()
 main = do
   paths <- getArgs >>= \case
+    p : ps ->
+      return $ p :| ps
     [] -> do
       home <- getHomeDirectory
       roots <-
@@ -249,7 +251,6 @@ main = do
       case roots of
         [] -> fail "No store path given."
         p : ps -> return $ p :| ps
-    p : ps -> return $ p :| ps
   storePaths <- mapM canonicalizePath paths
   names <- flip mapM storePaths $ \sp ->
     case mkStoreName sp of
