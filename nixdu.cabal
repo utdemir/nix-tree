@@ -16,17 +16,18 @@ library
   exposed-modules:     PathStats
                      , StorePath
   ghc-options:         -Wall -fno-warn-name-shadowing
-  build-depends:       base >= 4.11 && < 5
-                     , typed-process
-                     , text
-                     , lens
-                     , filepath
-                     , unordered-containers
-                     , hashable
-                     , containers
-                     , aeson
-                     , transformers
+  build-depends:       aeson
                      , async
+                     , base >= 4.11 && < 5
+                     , containers
+                     , deepseq >= 1.4.4.0
+                     , filepath
+                     , hashable
+                     , lens
+                     , text
+                     , transformers
+                     , typed-process
+                     , unordered-containers
 
 executable nixdu
   main-is:            Main.hs
@@ -34,12 +35,13 @@ executable nixdu
   default-language:   Haskell2010
   ghc-options:        -threaded -O2
   build-depends:      base
-                    , nixdu
                     , brick
                     , containers
+                    , deepseq >= 1.4.4.0
+                    , directory
+                    , filepath
+                    , hrfsize
+                    , nixdu
+                    , text
                     , unordered-containers
                     , vty
-                     , directory
-                    , hrfsize
-                    , text
-

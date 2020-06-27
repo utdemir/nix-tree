@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -6,7 +7,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE Strict #-}
 {-# LANGUAGE TypeApplications #-}
 
 module StorePath
@@ -16,32 +16,37 @@ module StorePath
     StorePath (..),
     StoreEnv (..),
     mkStoreEnv,
-    unsafeLookupStoreEnv,
-    transformStoreEnv,
-    fetchAllReferences,
+    seUnsafeLookup,
+    seGetRoots,
+    seBottomUp,
+    seFetchRefs,
   )
 where
 
 import Control.Applicative ((<|>))
+import Control.DeepSeq (NFData)
 import Control.Monad (guard)
 import Control.Monad.Trans.State (State, execState, gets, modify)
 import Data.Aeson ((.:), FromJSON (..), Value (..), decode)
+import Data.Foldable (foldl')
 import Data.Function ((&))
 import qualified Data.HashMap.Strict as HM
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
-import Data.List (foldl')
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import GHC.Generics (Generic)
 import System.FilePath.Posix (splitDirectories)
 import System.Process.Typed (proc, readProcessStdout_)
 
 --------------------------------------------------------------------------------
 
 newtype StoreName = StoreName Text
-  deriving newtype (Show, Eq, Ord, Hashable)
+  deriving newtype (Show, Eq, Ord, Hashable, NFData)
 
 mkStoreName :: FilePath -> Maybe StoreName
 mkStoreName path =
@@ -54,23 +59,26 @@ storeNameToPath (StoreName sn) = "/nix/store/" ++ T.unpack sn
 
 --------------------------------------------------------------------------------
 
-data StorePath ref payload
-  = StorePath
-      { spName :: StoreName,
-        spSize :: Int,
-        spRefs :: [ref],
-        spPayload :: payload
-      }
-  deriving (Show, Eq, Ord, Functor)
+data StorePath ref payload = StorePath
+  { spName :: StoreName,
+    spSize :: Int,
+    spRefs :: [ref],
+    spPayload :: payload
+  }
+  deriving (Show, Eq, Ord, Functor, Generic)
 
-mkStorePaths :: StoreName -> IO [StorePath StoreName ()]
-mkStorePaths name = do
+instance (NFData a, NFData b) => NFData (StorePath a b)
+
+mkStorePaths :: NonEmpty StoreName -> IO [StorePath StoreName ()]
+mkStorePaths names = do
   infos <-
     decode @[NixPathInfoResult]
       <$> readProcessStdout_
         ( proc
             "nix"
-            ["path-info", "--recursive", "--json", storeNameToPath name]
+            ( ["path-info", "--recursive", "--json"]
+                ++ map storeNameToPath (NE.toList names)
+            )
         )
       >>= maybe (fail "Failed parsing nix path-info output.") return
       >>= mapM assertValidInfo
@@ -97,56 +105,63 @@ mkStorePaths name = do
 
 --------------------------------------------------------------------------------
 
-data StoreEnv payload
-  = StoreEnv
-      { sePaths :: HashMap StoreName (StorePath StoreName payload),
-        seTop :: StoreName
-      }
-  deriving (Functor)
+data StoreEnv payload = StoreEnv
+  { sePaths :: HashMap StoreName (StorePath StoreName payload),
+    seRoots :: NonEmpty StoreName
+  }
+  deriving (Functor, Generic, NFData)
 
-mkStoreEnv :: StoreName -> IO (StoreEnv ())
-mkStoreEnv name = do
-  paths <- mkStorePaths name
+mkStoreEnv :: NonEmpty StoreName -> IO (StoreEnv ())
+mkStoreEnv names = do
+  paths <- mkStorePaths names
   return $
     StoreEnv
       ( paths
           & map (\p@StorePath {spName} -> (spName, p))
           & HM.fromList
       )
-      name
+      names
 
-unsafeLookupStoreEnv :: StoreEnv a -> StoreName -> StorePath StoreName a
-unsafeLookupStoreEnv StoreEnv {sePaths} name =
+seUnsafeLookup :: StoreEnv a -> StoreName -> StorePath StoreName a
+seUnsafeLookup StoreEnv {sePaths} name =
   fromMaybe
     (error $ "invariant violation, StoreName not found: " ++ show name)
     (HM.lookup name sePaths)
 
-fetchAllReferences ::
+seGetRoots :: StoreEnv a -> NonEmpty (StorePath StoreName a)
+seGetRoots env@StoreEnv {seRoots} =
+  NE.map (seUnsafeLookup env) seRoots
+
+seFetchRefs ::
   StoreEnv a ->
   (StoreName -> Bool) ->
-  StoreName ->
+  NonEmpty StoreName ->
   [StorePath StoreName a]
-fetchAllReferences env predicate = fst . go [] HS.empty
+seFetchRefs env predicate =
+  fst
+    . foldl'
+      (\(acc, visited) name -> go acc visited name)
+      ([], HS.empty)
   where
     go acc visited name
       | HS.member name visited = (acc, visited)
       | not (predicate name) = (acc, visited)
       | otherwise =
-        let sp@StorePath {spRefs} = unsafeLookupStoreEnv env name
+        let sp@StorePath {spRefs} = seUnsafeLookup env name
          in foldl'
               (\(acc', visited') name' -> go acc' visited' name')
               (sp : acc, HS.insert name visited)
               spRefs
 
-transformStoreEnv ::
+seBottomUp ::
   forall a b.
   (StorePath (StorePath StoreName b) a -> b) ->
   StoreEnv a ->
   StoreEnv b
-transformStoreEnv f StoreEnv {sePaths, seTop} =
+seBottomUp f StoreEnv {sePaths, seRoots} =
   StoreEnv
-    { sePaths = snd $ execState (go seTop) (sePaths, HM.empty),
-      seTop
+    { sePaths = snd $ execState (mapM_ go seRoots) (sePaths, HM.empty),
+      seRoots
     }
   where
     unsafeLookup k m =
@@ -156,8 +171,8 @@ transformStoreEnv f StoreEnv {sePaths, seTop} =
     go ::
       StoreName ->
       State
-        ( HM.HashMap StoreName (StorePath StoreName a),
-          HM.HashMap StoreName (StorePath StoreName b)
+        ( HashMap StoreName (StorePath StoreName a),
+          HashMap StoreName (StorePath StoreName b)
         )
         (StorePath StoreName b)
     go name = do
@@ -178,12 +193,11 @@ transformStoreEnv f StoreEnv {sePaths, seTop} =
 
 --------------------------------------------------------------------------------
 
-data NixPathInfo
-  = NixPathInfo
-      { npiPath :: FilePath,
-        npiNarSize :: Int,
-        npiReferences :: [FilePath]
-      }
+data NixPathInfo = NixPathInfo
+  { npiPath :: FilePath,
+    npiNarSize :: Int,
+    npiReferences :: [FilePath]
+  }
 
 data NixPathInfoResult
   = NixPathInfoValid NixPathInfo

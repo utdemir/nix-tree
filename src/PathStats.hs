@@ -1,46 +1,102 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE Strict #-}
 
 module PathStats
   ( PathStats (..),
     calculatePathStats,
+    markRouteTo,
+    whyDepends,
     module StorePath,
   )
 where
 
+import Control.DeepSeq (NFData)
+import Data.Foldable
+import Data.Function ((&))
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Map.Lazy as M
+import GHC.Generics (Generic)
 import StorePath
 
-data PathStats
-  = PathStats
-      { psTotalSize :: Int,
-        psAddedSize :: Int
+data IntermediatePathStats = IntermediatePathStats
+  { ipsAllRefs :: M.Map StoreName (StorePath StoreName ())
+  }
+
+data PathStats = PathStats
+  { psTotalSize :: !Int,
+    psAddedSize :: !Int
+  }
+  deriving (Show, Generic, NFData)
+
+mkIntermediateEnv ::
+  (StoreName -> Bool) ->
+  StoreEnv () ->
+  StoreEnv IntermediatePathStats
+mkIntermediateEnv pred =
+  seBottomUp $ \curr ->
+    IntermediatePathStats
+      { ipsAllRefs =
+          M.unions
+            ( M.fromList
+                [ (spName, const () <$> sp)
+                  | sp@StorePath {spName} <- spRefs curr,
+                    pred spName
+                ]
+                : map (ipsAllRefs . spPayload) (spRefs curr)
+            )
       }
-  deriving (Show)
+
+mkFinalEnv :: StoreEnv IntermediatePathStats -> StoreEnv PathStats
+mkFinalEnv env =
+  let totalSize = calculateEnvSize env
+   in flip seBottomUp env $ \StorePath {spName, spSize, spPayload} ->
+        let filteredSize =
+              seFetchRefs env (/= spName) (seRoots env)
+                & calculateRefsSize
+            addedSize = totalSize - filteredSize
+         in PathStats
+              { psTotalSize =
+                  spSize
+                    + calculateRefsSize (ipsAllRefs spPayload),
+                psAddedSize = addedSize
+              }
+  where
+    calculateEnvSize :: StoreEnv IntermediatePathStats -> Int
+    calculateEnvSize env =
+      seGetRoots env
+        & NE.toList
+        & map
+          ( \sp@StorePath {spName, spPayload} ->
+              M.insert
+                spName
+                (const () <$> sp)
+                (ipsAllRefs spPayload)
+          )
+        & M.unions
+        & calculateRefsSize
+    calculateRefsSize :: (Functor f, Foldable f) => f (StorePath a b) -> Int
+    calculateRefsSize = sum . fmap spSize
 
 calculatePathStats :: StoreEnv () -> StoreEnv PathStats
-calculatePathStats env =
-  let envWithTotals =
-        transformStoreEnv
-          ( \sp@StorePath {spName} ->
-              let refs = fetchAllReferences env (const True) spName
-               in PathStats
-                    { psTotalSize = sum (map spSize refs) + spSize sp,
-                      psAddedSize = 0
-                    }
-          )
-          env
-      totalSize =
-        psTotalSize . spPayload $
-          unsafeLookupStoreEnv envWithTotals (seTop env)
-   in transformStoreEnv
-        ( \StorePath {spName, spPayload} ->
-            let otherRefs = fetchAllReferences env (/= spName) (seTop env)
-                otherSize = sum (map spSize otherRefs)
-                addedSize = totalSize - otherSize
-             in spPayload
-                  { psAddedSize = addedSize
-                  }
-        )
-        envWithTotals
+calculatePathStats = mkFinalEnv . mkIntermediateEnv (const True)
+
+whyDepends :: StoreEnv a -> StoreName -> [[StoreName]]
+whyDepends env name =
+  flip
+    seBottomUp
+    env
+    ( \StorePath {spName, spRefs} ->
+        if spName == name
+          then [[]]
+          else concatMap (map (spName :) . spPayload) spRefs
+    )
+    & seGetRoots
+    & fmap spPayload
+    & concat
+
+markRouteTo :: StoreName -> StoreEnv a -> StoreEnv (Bool, a)
+markRouteTo name = seBottomUp $ \sp@StorePath {spName, spRefs} ->
+  ( spName == name || any (fst . spPayload) spRefs,
+    spPayload sp
+  )

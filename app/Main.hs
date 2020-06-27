@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -6,22 +7,28 @@ module Main where
 
 import qualified Brick as B
 import qualified Brick.Widgets.Border as B
+import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
-import Control.Monad (void)
+import Control.Concurrent (forkIO)
+import Control.DeepSeq (rnf)
+import Control.Exception (evaluate)
+import Control.Monad (filterM, void)
 import Data.Function ((&))
 import Data.Functor.Identity (Identity (Identity, runIdentity))
 import Data.List (find)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty)
+import qualified Data.Map as M
 import Data.Ord (Down (Down))
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import qualified Data.Text as T
 import qualified Graphics.Vty as V
 import PathStats
-import System.Directory (canonicalizePath)
+import System.Directory (canonicalizePath, doesDirectoryExist, getHomeDirectory)
 import System.Environment (getArgs)
+import System.FilePath ((</>))
 import qualified System.HrfSize as HRF
 
 data Panes
@@ -30,14 +37,18 @@ data Panes
   | NextPane
   deriving (Show, Eq, Ord)
 
-data AppEnv
-  = AppEnv
-      { aeActualStoreEnv :: StoreEnv PathStats,
-        aePrevPane :: List,
-        aeCurrPane :: List,
-        aeNextPane :: List,
-        aeParents :: [List]
-      }
+data Modal
+  = HelpModal
+  | WhyDependsModal StoreName
+
+data AppEnv = AppEnv
+  { aeActualStoreEnv :: StoreEnv PathStats,
+    aePrevPane :: List,
+    aeCurrPane :: List,
+    aeNextPane :: List,
+    aeParents :: [List],
+    aeOpenModal :: Maybe Modal
+  }
 
 type Path = StorePath StoreName PathStats
 
@@ -73,35 +84,87 @@ renderList isFocused list =
     )
     isFocused
     list
-    & B.hLimit 60
 
 app :: B.App AppEnv () Panes
 app =
   B.App
-    { B.appDraw = \env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} ->
-        [ ( (B.border $ renderList True aePrevPane)
-              B.<+> (B.border $ renderList True aeCurrPane)
-              B.<+> (B.border $ renderList False aeNextPane)
-          )
-            B.<=> (B.str . storeNameToPath . spName $ selectedPath env)
+    { B.appDraw = \env@AppEnv {aeOpenModal} ->
+        [ case aeOpenModal of
+            Nothing -> B.emptyWidget
+            Just HelpModal -> renderHelpModal,
+          renderMainScreen env
         ],
       B.appChooseCursor = \_ -> const Nothing,
-      B.appHandleEvent = \s -> \case
-        B.VtyEvent (V.EvKey V.KEsc []) -> B.halt s
-        B.VtyEvent (V.EvKey (V.KChar 'q') []) -> B.halt s
-        B.VtyEvent (V.EvKey (V.KChar 'h') []) -> B.continue $ moveLeft s
-        B.VtyEvent (V.EvKey (V.KChar 'j') []) -> B.continue $ move B.listMoveDown s
-        B.VtyEvent (V.EvKey (V.KChar 'k') []) -> B.continue $ move B.listMoveUp s
-        B.VtyEvent (V.EvKey (V.KChar 'l') []) -> B.continue $ moveRight s
-        B.VtyEvent (V.EvKey V.KPageUp []) -> B.continue =<< moveF B.listMovePageUp s
-        B.VtyEvent (V.EvKey V.KPageDown []) -> B.continue =<< moveF B.listMovePageDown s
-        _ -> B.continue s,
+      B.appHandleEvent = \s e ->
+        case aeOpenModal s of
+          Nothing ->
+            case e of
+              B.VtyEvent (V.EvKey k [])
+                | k `elem` [V.KChar 'q', V.KEsc] ->
+                  B.halt s
+              B.VtyEvent (V.EvKey (V.KChar '?') []) ->
+                B.continue s {aeOpenModal = Just HelpModal}
+              B.VtyEvent (V.EvKey k [])
+                | k `elem` [V.KChar 'h', V.KLeft] ->
+                  B.continue $ moveLeft s
+              B.VtyEvent (V.EvKey k [])
+                | k `elem` [V.KChar 'j', V.KDown] ->
+                  B.continue $ move B.listMoveDown s
+              B.VtyEvent (V.EvKey k [])
+                | k `elem` [V.KChar 'k', V.KUp] ->
+                  B.continue $ move B.listMoveUp s
+              B.VtyEvent (V.EvKey k [])
+                | k `elem` [V.KChar 'l', V.KRight] ->
+                  B.continue $ moveRight s
+              B.VtyEvent (V.EvKey V.KPageUp []) ->
+                B.continue =<< moveF B.listMovePageUp s
+              B.VtyEvent (V.EvKey V.KPageDown []) ->
+                B.continue =<< moveF B.listMovePageDown s
+              _ ->
+                B.continue s
+          Just HelpModal ->
+            case e of
+              B.VtyEvent (V.EvKey k [])
+                | k `elem` [V.KChar 'q', V.KEsc] ->
+                  B.continue s {aeOpenModal = Nothing}
+              _ ->
+                B.continue s,
       B.appStartEvent = \s -> return s,
       B.appAttrMap = \_ ->
         B.attrMap
           (V.white `B.on` V.black)
           [(B.listSelectedFocusedAttr, V.black `B.on` V.white)]
     }
+
+renderMainScreen :: AppEnv -> B.Widget Panes
+renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
+  (B.joinBorders . B.border)
+    ( B.hBox
+        [ renderList True aePrevPane,
+          B.vBorder,
+          renderList True aeCurrPane,
+          B.vBorder,
+          renderList False aeNextPane
+        ]
+    )
+    B.<=> (B.str . storeNameToPath . spName $ selectedPath env)
+
+renderHelpModal :: B.Widget a
+renderHelpModal =
+  B.txt helpText
+    & B.border
+    & B.hLimitPercent 90
+    & B.vLimitPercent 60
+    & B.centerLayer
+  where
+    helpText =
+      T.intercalate
+        "\n"
+        [ "hjkl/Arrow Keys : Navigation",
+          "q/Esc:          : Quit / Close modal.",
+          "w               : why-depends mode.",
+          "?               : Show help text."
+        ]
 
 run :: StoreEnv PathStats -> IO ()
 run env = void $ B.defaultMain app appEnv
@@ -113,11 +176,13 @@ run env = void $ B.defaultMain app appEnv
           aePrevPane =
             B.list PrevPane S.empty 0,
           aeCurrPane =
-            B.list CurrPane (S.singleton . unsafeLookupStoreEnv env $ seTop env) 0,
+            B.list CurrPane (S.fromList . NE.toList $ seGetRoots env) 0,
           aeNextPane =
             B.list NextPane S.empty 0,
           aeParents =
-            []
+            [],
+          aeOpenModal =
+            Nothing
         }
         & repopulateSecondPane
 
@@ -157,7 +222,7 @@ repopulateSecondPane env@AppEnv {aeActualStoreEnv, aeNextPane} =
             B.listReplace
               ( S.sortOn (Down . psTotalSize . spPayload)
                   . S.fromList
-                  . map (unsafeLookupStoreEnv aeActualStoreEnv)
+                  . map (seUnsafeLookup aeActualStoreEnv)
                   $ spRefs ref
               )
               (Just 0)
@@ -172,18 +237,23 @@ selectedPath AppEnv {aeCurrPane} =
 
 main :: IO ()
 main = do
-  getArgs >>= \case
-    [storePath] -> do
-      canon <- canonicalizePath storePath
-      env <- case mkStoreName canon of
-        Nothing -> fail $ "Not a store path: " ++ show storePath
-        Just xs -> do
-          putStrLn $ "Gathering information..."
-          calculatePathStats <$> mkStoreEnv xs
-      putStrLn $
-        "  Total size: "
-          ++ show (psTotalSize . spPayload $ unsafeLookupStoreEnv env (seTop env))
-      putStrLn $ "Running..."
-      run env
-      putStrLn $ "Done."
-    _ -> fail "invalid syntax."
+  paths <- getArgs >>= \case
+    [] -> do
+      home <- getHomeDirectory
+      roots <-
+        filterM
+          doesDirectoryExist
+          [ home </> ".nix-profile",
+            "/var/run/current-system"
+          ]
+      case roots of
+        [] -> fail "No store path given."
+        p : ps -> return $ p :| ps
+    p : ps -> return $ p :| ps
+  storePaths <- mapM canonicalizePath paths
+  names <- flip mapM storePaths $ \sp ->
+    case mkStoreName sp of
+      Nothing -> fail $ "Not a store path: " ++ show sp
+      Just n -> return n
+  env <- calculatePathStats <$> mkStoreEnv names
+  run env
