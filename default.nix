@@ -1,4 +1,3 @@
-{ compiler ? "ghc8101" }:
 let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs { };
@@ -6,7 +5,7 @@ let
   gitignore = extra:
     pkgs.nix-gitignore.gitignoreSourcePure ([ ./.gitignore ] ++ extra);
 
-  myHaskellPackages = pkgs.haskell.packages.${compiler}.override {
+  myHaskellPackages = pkgs.haskellPackages.override {
     overrides = hself: hsuper: {
       "nixdu" =
         hself.callCabal2nix
