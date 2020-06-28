@@ -13,12 +13,12 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.Function ((&))
+import Data.List (transpose)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Lazy as M
 import GHC.Generics (Generic)
 import StorePath
-import Data.List (transpose)
 
 data IntermediatePathStats = IntermediatePathStats
   { ipsAllRefs :: M.Map StoreName (StorePath StoreName ())
@@ -89,9 +89,10 @@ whyDepends env name =
         if spName curr == name
           then [curr {spRefs = map spName (spRefs curr)} :| []]
           else
-            concat . transpose $ map
-              (map (curr {spRefs = map spName (spRefs curr)} NE.<|) . spPayload)
-              (spRefs curr)
+            concat . transpose $
+              map
+                (map (curr {spRefs = map spName (spRefs curr)} NE.<|) . spPayload)
+                (spRefs curr)
     )
     env
     & seGetRoots

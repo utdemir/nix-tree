@@ -92,21 +92,20 @@ renderList isFocused list =
            spPayload = PathStats {psTotalSize, psAddedSize},
            spRefs
          } ->
-          let color  =
+          let color =
                 if null spRefs
-                then B.withAttr "terminal"
-                else id
-
+                  then B.withAttr "terminal"
+                  else id
            in color $
                 B.padRight B.Max (B.txt $ storeNameToShortText spName)
-                B.<+> B.padLeft
-                  B.Max
-                  ( B.txt $
-                      prettySize psTotalSize
-                        <> " ("
-                        <> prettySize psAddedSize
-                        <> ")"
-                  )
+                  B.<+> B.padLeft
+                    B.Max
+                    ( B.txt $
+                        prettySize psTotalSize
+                          <> " ("
+                          <> prettySize psAddedSize
+                          <> ")"
+                    )
     )
     isFocused
     list
@@ -177,8 +176,9 @@ app =
       B.appAttrMap = \_ ->
         B.attrMap
           (V.white `B.on` V.black)
-          [ (B.listSelectedFocusedAttr, V.black `B.on` V.white)
-          , ("terminal", B.fg V.red) ]
+          [ (B.listSelectedFocusedAttr, V.black `B.on` V.white),
+            ("terminal", B.fg V.red)
+          ]
     }
 
 renderMainScreen :: AppEnv -> B.Widget Widgets
@@ -197,11 +197,13 @@ renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
 renderModeline :: AppEnv -> B.Widget Widgets
 renderModeline env =
   let selected = selectedPath env
-  in  B.txt $ T.intercalate " - " [
-        T.pack $ storeNameToPath (spName selected),
-        "NAR Size: " <> prettySize (spSize selected),
-        "Closure Size: " <> prettySize (psTotalSize $ spPayload selected)
-      ]
+   in B.txt $
+        T.intercalate
+          " - "
+          [ T.pack $ storeNameToPath (spName selected),
+            "NAR Size: " <> prettySize (spSize selected),
+            "Closure Size: " <> prettySize (psTotalSize $ spPayload selected)
+          ]
 
 renderHelpModal :: B.Widget a
 renderHelpModal =
@@ -337,12 +339,10 @@ selectPath path env@AppEnv {aeActualStoreEnv} =
                 & repopulateNextPane
   where
     mkList name possible selected =
-      B.list
-        name
-        (S.fromList possible)
-        1
-        & B.listMoveTo
-          (fromMaybe (-1) $ (((==) `on` spName) selected) `findIndex` possible)
+      let contents = S.sortOn (Down . psTotalSize . spPayload) (S.fromList possible)
+       in B.list name contents 1
+            & B.listMoveTo
+              (fromMaybe (0) $ (((==) `on` spName) selected) `S.findIndexL` contents)
     emptyPane =
       B.list WidgetPrevPane S.empty 0
 
@@ -394,8 +394,8 @@ main = do
 
 prettySize :: Int -> T.Text
 prettySize size = case HRF.convertSize $ fromIntegral size of
-                HRF.Bytes d -> T.pack (show d)
-                HRF.KiB d -> T.pack (show d) <> " KiB"
-                HRF.MiB d -> T.pack (show d) <> " MiB"
-                HRF.GiB d -> T.pack (show d) <> " GiB"
-                HRF.TiB d -> T.pack (show d) <> " TiB"
+  HRF.Bytes d -> T.pack (show d)
+  HRF.KiB d -> T.pack (show d) <> " KiB"
+  HRF.MiB d -> T.pack (show d) <> " MiB"
+  HRF.GiB d -> T.pack (show d) <> " GiB"
+  HRF.TiB d -> T.pack (show d) <> " TiB"
