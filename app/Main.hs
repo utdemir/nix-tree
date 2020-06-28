@@ -246,8 +246,11 @@ showWhyDepends env@AppEnv {aeActualStoreEnv} =
     { aeOpenModal =
         Just . ModalWhyDepends $
           let selected = selectedPath env
-              xs = whyDepends aeActualStoreEnv (spName selected)
-           in B.list WidgetWhyDepends (S.fromList xs) 1
+              route = selectedPaths env
+              xs = S.fromList $ whyDepends aeActualStoreEnv (spName selected)
+           in B.list WidgetWhyDepends xs 1
+                & B.listMoveTo
+                  (fromMaybe 0 $ (((==) `on` fmap spName) route) `S.findIndexL` xs)
     }
 
 move :: (List -> List) -> AppEnv -> AppEnv
