@@ -13,6 +13,7 @@ module StorePath
   ( StoreName (..),
     mkStoreName,
     storeNameToPath,
+    storeNameToText,
     StorePath (..),
     StoreEnv (..),
     mkStoreEnv,
@@ -53,6 +54,9 @@ mkStoreName path =
   case splitDirectories path of
     "/" : "nix" : "store" : name : _ -> Just . StoreName $ T.pack name
     _ -> Nothing
+
+storeNameToText :: StoreName -> Text
+storeNameToText (StoreName n) = n
 
 storeNameToPath :: StoreName -> FilePath
 storeNameToPath (StoreName sn) = "/nix/store/" ++ T.unpack sn

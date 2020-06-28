@@ -13,13 +13,15 @@ import Control.Concurrent (forkIO)
 import Control.DeepSeq (rnf)
 import Control.Exception (evaluate)
 import Control.Monad (filterM, void)
+import Data.Foldable (foldl')
 import Data.Function ((&))
+import Data.Function (on)
 import Data.Functor.Identity (Identity (Identity, runIdentity))
-import Data.List (find)
+import qualified Data.HashMap.Strict as HM
+import Data.List (findIndex)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
-import Data.List.NonEmpty (NonEmpty)
-import qualified Data.Map as M
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Ord (Down (Down))
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
@@ -31,15 +33,16 @@ import System.Environment (getArgs)
 import System.FilePath ((</>))
 import qualified System.HrfSize as HRF
 
-data Panes
-  = PrevPane
-  | CurrPane
-  | NextPane
+data Widgets
+  = WidgetPrevPane
+  | WidgetCurrPane
+  | WidgetNextPane
+  | WidgetWhyDepends
   deriving (Show, Eq, Ord)
 
 data Modal
-  = HelpModal
-  | WhyDependsModal StoreName
+  = ModalHelp
+  | ModalWhyDepends (B.GenericList Widgets Seq (NonEmpty Path))
 
 data AppEnv = AppEnv
   { aeActualStoreEnv :: StoreEnv PathStats,
@@ -52,27 +55,50 @@ data AppEnv = AppEnv
 
 type Path = StorePath StoreName PathStats
 
-type List = B.GenericList Panes Seq Path
+type List = B.GenericList Widgets Seq Path
+
+storeNameToShortText :: StoreName -> T.Text
+storeNameToShortText = T.drop 1 . T.dropWhile (/= '-') . storeNameToText
+
+run :: StoreEnv PathStats -> IO ()
+run env = void $ B.defaultMain app appEnv
+  where
+    appEnv =
+      AppEnv
+        { aeActualStoreEnv =
+            env,
+          aePrevPane =
+            B.list WidgetPrevPane S.empty 0,
+          aeCurrPane =
+            B.list WidgetCurrPane (S.fromList . NE.toList $ seGetRoots env) 0,
+          aeNextPane =
+            B.list WidgetNextPane S.empty 0,
+          aeParents =
+            [],
+          aeOpenModal =
+            Nothing
+        }
+        & repopulateNextPane
 
 renderList ::
   Bool ->
   List ->
-  B.Widget Panes
+  B.Widget Widgets
 renderList isFocused list =
   B.renderList
     ( \_
        StorePath
-         { spName = StoreName txt,
-           spPayload = PathStats {psTotalSize, psAddedSize}
+         { spName,
+           spPayload = PathStats {psTotalSize, psAddedSize},
+           spRefs
          } ->
-          let prettyName = T.drop 1 . T.dropWhile (/= '-') $ txt
-              prettySize size = case HRF.convertSize $ fromIntegral size of
-                HRF.Bytes d -> T.pack (show d)
-                HRF.KiB d -> T.pack (show d) <> " KiB"
-                HRF.MiB d -> T.pack (show d) <> " MiB"
-                HRF.GiB d -> T.pack (show d) <> " GiB"
-                HRF.TiB d -> T.pack (show d) <> " TiB"
-           in B.padRight B.Max (B.txt prettyName)
+          let color  =
+                if null spRefs
+                then B.withAttr "terminal"
+                else id
+
+           in color $
+                B.padRight B.Max (B.txt $ storeNameToShortText spName)
                 B.<+> B.padLeft
                   B.Max
                   ( B.txt $
@@ -85,58 +111,77 @@ renderList isFocused list =
     isFocused
     list
 
-app :: B.App AppEnv () Panes
+app :: B.App AppEnv () Widgets
 app =
   B.App
     { B.appDraw = \env@AppEnv {aeOpenModal} ->
         [ case aeOpenModal of
             Nothing -> B.emptyWidget
-            Just HelpModal -> renderHelpModal,
+            Just ModalHelp -> renderHelpModal
+            Just (ModalWhyDepends l) -> renderWhyDependsModal l,
           renderMainScreen env
         ],
       B.appChooseCursor = \_ -> const Nothing,
       B.appHandleEvent = \s e ->
-        case aeOpenModal s of
-          Nothing ->
-            case e of
-              B.VtyEvent (V.EvKey k [])
-                | k `elem` [V.KChar 'q', V.KEsc] ->
-                  B.halt s
-              B.VtyEvent (V.EvKey (V.KChar '?') []) ->
-                B.continue s {aeOpenModal = Just HelpModal}
-              B.VtyEvent (V.EvKey k [])
-                | k `elem` [V.KChar 'h', V.KLeft] ->
-                  B.continue $ moveLeft s
-              B.VtyEvent (V.EvKey k [])
-                | k `elem` [V.KChar 'j', V.KDown] ->
-                  B.continue $ move B.listMoveDown s
-              B.VtyEvent (V.EvKey k [])
-                | k `elem` [V.KChar 'k', V.KUp] ->
-                  B.continue $ move B.listMoveUp s
-              B.VtyEvent (V.EvKey k [])
-                | k `elem` [V.KChar 'l', V.KRight] ->
-                  B.continue $ moveRight s
-              B.VtyEvent (V.EvKey V.KPageUp []) ->
-                B.continue =<< moveF B.listMovePageUp s
-              B.VtyEvent (V.EvKey V.KPageDown []) ->
-                B.continue =<< moveF B.listMovePageDown s
-              _ ->
-                B.continue s
-          Just HelpModal ->
-            case e of
-              B.VtyEvent (V.EvKey k [])
-                | k `elem` [V.KChar 'q', V.KEsc] ->
-                  B.continue s {aeOpenModal = Nothing}
-              _ ->
-                B.continue s,
+        case (e, aeOpenModal s) of
+          -- main screen
+          (B.VtyEvent (V.EvKey k []), Nothing)
+            | k `elem` [V.KChar 'q', V.KEsc] ->
+              B.halt s
+          (B.VtyEvent (V.EvKey (V.KChar '?') []), Nothing) ->
+            B.continue s {aeOpenModal = Just ModalHelp}
+          (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) ->
+            B.continue $ showWhyDepends s
+          (B.VtyEvent (V.EvKey k []), Nothing)
+            | k `elem` [V.KChar 'h', V.KLeft] ->
+              B.continue $ moveLeft s
+          (B.VtyEvent (V.EvKey k []), Nothing)
+            | k `elem` [V.KChar 'j', V.KDown] ->
+              B.continue $ move B.listMoveDown s
+          (B.VtyEvent (V.EvKey k []), Nothing)
+            | k `elem` [V.KChar 'k', V.KUp] ->
+              B.continue $ move B.listMoveUp s
+          (B.VtyEvent (V.EvKey k []), Nothing)
+            | k `elem` [V.KChar 'l', V.KRight] ->
+              B.continue $ moveRight s
+          (B.VtyEvent (V.EvKey V.KPageUp []), Nothing) ->
+            B.continue =<< moveF B.listMovePageUp s
+          (B.VtyEvent (V.EvKey V.KPageDown []), Nothing) ->
+            B.continue =<< moveF B.listMovePageDown s
+          -- modals
+          (B.VtyEvent (V.EvKey k []), Just _)
+            | k `elem` [V.KChar 'q', V.KEsc] ->
+              B.continue s {aeOpenModal = Nothing}
+          -- why-depends modal
+          (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
+            | k `elem` [V.KChar 'j', V.KDown] ->
+              B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveDown l)}
+          (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
+            | k `elem` [V.KChar 'k', V.KUp] ->
+              B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveUp l)}
+          (B.VtyEvent (V.EvKey V.KPageUp []), Just (ModalWhyDepends l)) ->
+            B.listMovePageUp l >>= \l' ->
+              B.continue s {aeOpenModal = Just $ ModalWhyDepends l'}
+          (B.VtyEvent (V.EvKey V.KPageDown []), Just (ModalWhyDepends l)) ->
+            B.listMovePageDown l >>= \l' ->
+              B.continue s {aeOpenModal = Just $ ModalWhyDepends l'}
+          (B.VtyEvent (V.EvKey V.KEnter []), Just (ModalWhyDepends l)) ->
+            let closed = s {aeOpenModal = Nothing}
+             in case B.listSelectedElement l of
+                  Nothing -> B.continue closed
+                  Just (_, path) -> B.continue $ selectPath path closed
+          -- otherwise
+          _ ->
+            B.continue s,
       B.appStartEvent = \s -> return s,
       B.appAttrMap = \_ ->
         B.attrMap
           (V.white `B.on` V.black)
-          [(B.listSelectedFocusedAttr, V.black `B.on` V.white)]
+          [ (B.listSelectedFocusedAttr, V.black `B.on` V.white)
+          , ("terminal", B.fg V.red) ]
     }
 
-renderMainScreen :: AppEnv -> B.Widget Panes
+renderMainScreen :: AppEnv -> B.Widget Widgets
 renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
   (B.joinBorders . B.border)
     ( B.hBox
@@ -147,7 +192,16 @@ renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
           renderList False aeNextPane
         ]
     )
-    B.<=> (B.str . storeNameToPath . spName $ selectedPath env)
+    B.<=> renderModeline env
+
+renderModeline :: AppEnv -> B.Widget Widgets
+renderModeline env =
+  let selected = selectedPath env
+  in  B.txt $ T.intercalate " - " [
+        T.pack $ storeNameToPath (spName selected),
+        "NAR Size: " <> prettySize (spSize selected),
+        "Closure Size: " <> prettySize (psTotalSize $ spPayload selected)
+      ]
 
 renderHelpModal :: B.Widget a
 renderHelpModal =
@@ -160,38 +214,46 @@ renderHelpModal =
     helpText =
       T.intercalate
         "\n"
-        [ "hjkl/Arrow Keys : Navigation",
-          "q/Esc:          : Quit / Close modal.",
-          "w               : why-depends mode.",
-          "?               : Show help text."
+        [ "hjkl/Arrow Keys : Navigate",
+          "q/Esc:          : Quit / Close modal",
+          "w               : Open why-depends mode",
+          "?               : Show LHelp"
         ]
 
-run :: StoreEnv PathStats -> IO ()
-run env = void $ B.defaultMain app appEnv
+renderWhyDependsModal ::
+  B.GenericList Widgets Seq (NonEmpty Path) ->
+  B.Widget Widgets
+renderWhyDependsModal l =
+  B.renderList renderDepends True l
+    & B.hLimitPercent 80
+    & B.vLimitPercent 60
+    & B.border
+    & B.centerLayer
   where
-    appEnv =
-      AppEnv
-        { aeActualStoreEnv =
-            env,
-          aePrevPane =
-            B.list PrevPane S.empty 0,
-          aeCurrPane =
-            B.list CurrPane (S.fromList . NE.toList $ seGetRoots env) 0,
-          aeNextPane =
-            B.list NextPane S.empty 0,
-          aeParents =
-            [],
-          aeOpenModal =
-            Nothing
-        }
-        & repopulateSecondPane
+    renderDepends _ =
+      B.txt . pathsToText
+    pathsToText xs =
+      xs
+        & NE.toList
+        & fmap (storeNameToShortText . spName)
+        & T.intercalate " → "
+
+showWhyDepends :: AppEnv -> AppEnv
+showWhyDepends env@AppEnv {aeActualStoreEnv} =
+  env
+    { aeOpenModal =
+        Just . ModalWhyDepends $
+          let selected = selectedPath env
+              xs = whyDepends aeActualStoreEnv (spName selected)
+           in B.list WidgetWhyDepends (S.fromList xs) 1
+    }
 
 move :: (List -> List) -> AppEnv -> AppEnv
 move f = runIdentity . moveF (Identity . f)
 
 moveF :: Applicative f => (List -> f List) -> AppEnv -> f AppEnv
 moveF f env@AppEnv {aeCurrPane} =
-  repopulateSecondPane . (\p -> env {aeCurrPane = p}) <$> f aeCurrPane
+  repopulateNextPane . (\p -> env {aeCurrPane = p}) <$> f aeCurrPane
 
 moveLeft :: AppEnv -> AppEnv
 moveLeft env@AppEnv {aeParents = []} = env
@@ -199,8 +261,8 @@ moveLeft env@AppEnv {aePrevPane, aeCurrPane, aeParents = parent : grandparents} 
   env
     { aeParents = grandparents,
       aePrevPane = parent,
-      aeCurrPane = aePrevPane {B.listName = CurrPane},
-      aeNextPane = aeCurrPane {B.listName = NextPane}
+      aeCurrPane = aePrevPane {B.listName = WidgetCurrPane},
+      aeNextPane = aeCurrPane {B.listName = WidgetNextPane}
     }
 
 moveRight :: AppEnv -> AppEnv
@@ -208,14 +270,14 @@ moveRight env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeParents}
   | null (B.listElements aeNextPane) = env
   | otherwise =
     env
-      { aePrevPane = aeCurrPane {B.listName = PrevPane},
-        aeCurrPane = aeNextPane {B.listName = CurrPane},
+      { aePrevPane = aeCurrPane {B.listName = WidgetPrevPane},
+        aeCurrPane = aeNextPane {B.listName = WidgetCurrPane},
         aeParents = aePrevPane : aeParents
       }
-      & repopulateSecondPane
+      & repopulateNextPane
 
-repopulateSecondPane :: AppEnv -> AppEnv
-repopulateSecondPane env@AppEnv {aeActualStoreEnv, aeNextPane} =
+repopulateNextPane :: AppEnv -> AppEnv
+repopulateNextPane env@AppEnv {aeActualStoreEnv, aeNextPane} =
   let ref = selectedPath env
    in env
         { aeNextPane =
@@ -230,10 +292,59 @@ repopulateSecondPane env@AppEnv {aeActualStoreEnv, aeNextPane} =
         }
 
 selectedPath :: AppEnv -> Path
-selectedPath AppEnv {aeCurrPane} =
-  case B.listSelectedElement aeCurrPane of
-    Nothing -> error "invariant violation: no selected element"
-    Just (_, sn) -> sn
+selectedPath = NE.head . selectedPaths
+
+selectedPaths :: AppEnv -> NonEmpty Path
+selectedPaths AppEnv {aePrevPane, aeCurrPane, aeParents} =
+  let parents =
+        mapMaybe
+          (fmap snd . B.listSelectedElement)
+          (aePrevPane : aeParents)
+   in case B.listSelectedElement aeCurrPane of
+        Nothing -> error "invariant violation: no selected element"
+        Just (_, p) -> p :| parents
+
+selectPath :: NonEmpty Path -> AppEnv -> AppEnv
+selectPath path env
+  | (spName <$> path) == (spName <$> selectedPaths env) =
+    env
+selectPath path env@AppEnv {aeActualStoreEnv} =
+  let root :| children = NE.reverse path
+      lists =
+        NE.scanl
+          ( \(_, prev) curr ->
+              ( map (seUnsafeLookup aeActualStoreEnv) $
+                  spRefs prev,
+                curr
+              )
+          )
+          (NE.toList (seGetRoots aeActualStoreEnv), root)
+          children
+          & NE.reverse
+          & fmap
+            (\(possible, selected) -> mkList WidgetPrevPane possible selected)
+          & (<> (emptyPane :| []))
+   in case lists of
+        (curr :| prevs) ->
+          let (prev, parents) = case prevs of
+                [] -> (emptyPane, [])
+                p : ps -> (p, ps)
+           in env
+                { aeParents = parents,
+                  aePrevPane = prev,
+                  aeCurrPane = curr {B.listName = WidgetCurrPane}
+                }
+                & repopulateNextPane
+  where
+    mkList name possible selected =
+      B.list
+        name
+        (S.fromList possible)
+        1
+        & B.listMoveTo
+          (fromMaybe (-1) $ (((==) `on` spName) selected) `findIndex` possible)
+    emptyPane =
+      B.list WidgetPrevPane S.empty 0
 
 main :: IO ()
 main = do
@@ -257,4 +368,34 @@ main = do
       Nothing -> fail $ "Not a store path: " ++ show sp
       Just n -> return n
   env <- calculatePathStats <$> mkStoreEnv names
+
+  -- Small hack to evaluate the tree branches with a breadth-first
+  -- traversal in the background
+  let go _ [] = return ()
+      go remaining nodes = do
+        let (newRemaining, foundNodes) =
+              foldl'
+                ( \(nr, fs) n ->
+                    ( HM.delete n nr,
+                      HM.lookup n nr : fs
+                    )
+                )
+                (remaining, [])
+                nodes
+        evaluate $ rnf foundNodes
+        go
+          newRemaining
+          (concatMap (maybe [] spRefs) foundNodes)
+  _ <- forkIO $ go (sePaths env) (NE.toList $ seRoots env)
+
   run env
+
+-- Utils
+
+prettySize :: Int -> T.Text
+prettySize size = case HRF.convertSize $ fromIntegral size of
+                HRF.Bytes d -> T.pack (show d)
+                HRF.KiB d -> T.pack (show d) <> " KiB"
+                HRF.MiB d -> T.pack (show d) <> " MiB"
+                HRF.GiB d -> T.pack (show d) <> " GiB"
+                HRF.TiB d -> T.pack (show d) <> " TiB"

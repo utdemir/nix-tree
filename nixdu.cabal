@@ -42,6 +42,7 @@ executable nixdu
                     , filepath
                     , hrfsize
                     , nixdu
+                    , parallel
                     , text
                     , unordered-containers
                     , vty

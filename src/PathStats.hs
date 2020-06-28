@@ -12,12 +12,13 @@ module PathStats
 where
 
 import Control.DeepSeq (NFData)
-import Data.Foldable
 import Data.Function ((&))
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Lazy as M
 import GHC.Generics (Generic)
 import StorePath
+import Data.List (transpose)
 
 data IntermediatePathStats = IntermediatePathStats
   { ipsAllRefs :: M.Map StoreName (StorePath StoreName ())
@@ -81,19 +82,22 @@ mkFinalEnv env =
 calculatePathStats :: StoreEnv () -> StoreEnv PathStats
 calculatePathStats = mkFinalEnv . mkIntermediateEnv (const True)
 
-whyDepends :: StoreEnv a -> StoreName -> [[StoreName]]
+whyDepends :: StoreEnv a -> StoreName -> [NonEmpty (StorePath StoreName a)]
 whyDepends env name =
-  flip
-    seBottomUp
-    env
-    ( \StorePath {spName, spRefs} ->
-        if spName == name
-          then [[]]
-          else concatMap (map (spName :) . spPayload) spRefs
+  seBottomUp
+    ( \curr ->
+        if spName curr == name
+          then [curr {spRefs = map spName (spRefs curr)} :| []]
+          else
+            concat . transpose $ map
+              (map (curr {spRefs = map spName (spRefs curr)} NE.<|) . spPayload)
+              (spRefs curr)
     )
+    env
     & seGetRoots
     & fmap spPayload
     & concat
+    & map NE.reverse
 
 markRouteTo :: StoreName -> StoreEnv a -> StoreEnv (Bool, a)
 markRouteTo name = seBottomUp $ \sp@StorePath {spName, spRefs} ->
