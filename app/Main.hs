@@ -208,7 +208,7 @@ renderModeline env =
 renderHelpModal :: B.Widget a
 renderHelpModal =
   B.txt helpText
-    & B.border
+    & B.borderWithLabel (B.txt "Help")
     & B.hLimitPercent 90
     & B.vLimitPercent 60
     & B.centerLayer
@@ -229,7 +229,7 @@ renderWhyDependsModal l =
   B.renderList renderDepends True l
     & B.hLimitPercent 80
     & B.vLimitPercent 60
-    & B.border
+    & B.borderWithLabel (B.txt "why-depends")
     & B.centerLayer
   where
     renderDepends _ =
