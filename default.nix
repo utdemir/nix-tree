@@ -3,14 +3,15 @@ let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs { };
 
-  gitignore = pkgs.nix-gitignore.gitignoreSourcePure [ ./.gitignore ];
+  gitignore = extra:
+    pkgs.nix-gitignore.gitignoreSourcePure ([ ./.gitignore ] ++ extra);
 
   myHaskellPackages = pkgs.haskell.packages.${compiler}.override {
     overrides = hself: hsuper: {
       "nixdu" =
         hself.callCabal2nix
           "nixdu"
-          (gitignore ./.) { };
+          (gitignore [ "asciicast.sh" ] ./.) { };
     };
   };
 
