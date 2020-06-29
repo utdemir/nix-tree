@@ -50,12 +50,16 @@ data AppEnv = AppEnv
     aeCurrPane :: List,
     aeNextPane :: List,
     aeParents :: [List],
-    aeOpenModal :: Maybe Modal
+    aeOpenModal :: Maybe Modal,
+    aeShowInfoPane :: Bool
   }
 
 type Path = StorePath StoreName PathStats
 
 type List = B.GenericList Widgets Seq Path
+
+attrTerminal :: B.AttrName
+attrTerminal = "terminal"
 
 storeNameToShortText :: StoreName -> T.Text
 storeNameToShortText = T.drop 1 . T.dropWhile (/= '-') . storeNameToText
@@ -76,7 +80,9 @@ run env = void $ B.defaultMain app appEnv
           aeParents =
             [],
           aeOpenModal =
-            Nothing
+            Nothing,
+          aeShowInfoPane =
+            True
         }
         & repopulateNextPane
 
@@ -94,7 +100,7 @@ renderList isFocused list =
          } ->
           let color =
                 if null spRefs
-                  then B.withAttr "terminal"
+                  then B.withAttr attrTerminal
                   else id
            in color $
                 B.padRight B.Max (B.txt $ storeNameToShortText spName)
@@ -102,9 +108,12 @@ renderList isFocused list =
                     B.Max
                     ( B.txt $
                         prettySize psTotalSize
-                          <> " ("
-                          <> prettySize psAddedSize
-                          <> ")"
+                          <> if not (null spRefs)
+                            then
+                              " ("
+                                <> prettySize psAddedSize
+                                <> ")"
+                            else mempty
                     )
     )
     isFocused
@@ -131,6 +140,8 @@ app =
             B.continue s {aeOpenModal = Just ModalHelp}
           (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) ->
             B.continue $ showWhyDepends s
+          (B.VtyEvent (V.EvKey (V.KChar 'i') []), Nothing) ->
+            B.continue $ s {aeShowInfoPane = not (aeShowInfoPane s)}
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'h', V.KLeft] ->
               B.continue $ moveLeft s
@@ -177,12 +188,12 @@ app =
         B.attrMap
           (V.white `B.on` V.black)
           [ (B.listSelectedFocusedAttr, V.black `B.on` V.white),
-            ("terminal", B.fg V.red)
+            (attrTerminal, B.fg V.blue)
           ]
     }
 
 renderMainScreen :: AppEnv -> B.Widget Widgets
-renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
+renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeShowInfoPane} =
   (B.joinBorders . B.border)
     ( B.hBox
         [ renderList True aePrevPane,
@@ -192,7 +203,7 @@ renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
           renderList False aeNextPane
         ]
     )
-    B.<=> renderModeline env
+    B.<=> if aeShowInfoPane then renderInfoPane env else renderModeline env
 
 renderModeline :: AppEnv -> B.Widget Widgets
 renderModeline env =
@@ -203,6 +214,23 @@ renderModeline env =
           [ T.pack $ storeNameToPath (spName selected),
             "NAR Size: " <> prettySize (spSize selected),
             "Closure Size: " <> prettySize (psTotalSize $ spPayload selected)
+          ]
+
+renderInfoPane :: AppEnv -> B.Widget Widgets
+renderInfoPane env =
+  let selected = selectedPath env
+      immediateParents = psImmediateParents $ spPayload selected
+   in B.txt $
+        T.intercalate
+          "\n"
+          [ T.pack $ storeNameToPath (spName selected),
+            "NAR Size: " <> prettySize (spSize selected),
+            "Closure Size: " <> prettySize (psTotalSize $ spPayload selected),
+            if null immediateParents
+              then "Immediate Parents: -"
+              else
+                "Immediate Parents (" <> T.pack (show $ length immediateParents) <> "): "
+                  <> T.intercalate ", " (map storeNameToShortText immediateParents)
           ]
 
 renderHelpModal :: B.Widget a
@@ -217,9 +245,10 @@ renderHelpModal =
       T.intercalate
         "\n"
         [ "hjkl/Arrow Keys : Navigate",
-          "q/Esc:          : Quit / Close modal",
+          "q/Esc:          : Quit / close modal",
           "w               : Open why-depends mode",
-          "?               : Show LHelp"
+          "i               : Toggle modeline",
+          "?               : Show help"
         ]
 
 renderWhyDependsModal ::

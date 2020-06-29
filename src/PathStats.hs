@@ -12,11 +12,13 @@ module PathStats
 where
 
 import Control.DeepSeq (NFData)
+import Data.Foldable (foldl')
 import Data.Function ((&))
 import Data.List (transpose)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Lazy as M
+import qualified Data.Set as S
 import GHC.Generics (Generic)
 import StorePath
 
@@ -26,7 +28,8 @@ data IntermediatePathStats = IntermediatePathStats
 
 data PathStats = PathStats
   { psTotalSize :: !Int,
-    psAddedSize :: !Int
+    psAddedSize :: !Int,
+    psImmediateParents :: [StoreName]
   }
   deriving (Show, Generic, NFData)
 
@@ -51,6 +54,7 @@ mkIntermediateEnv pred =
 mkFinalEnv :: StoreEnv IntermediatePathStats -> StoreEnv PathStats
 mkFinalEnv env =
   let totalSize = calculateEnvSize env
+      immediateParents = calculateImmediateParents (sePaths env)
    in flip seBottomUp env $ \StorePath {spName, spSize, spPayload} ->
         let filteredSize =
               seFetchRefs env (/= spName) (seRoots env)
@@ -60,7 +64,9 @@ mkFinalEnv env =
               { psTotalSize =
                   spSize
                     + calculateRefsSize (ipsAllRefs spPayload),
-                psAddedSize = addedSize
+                psAddedSize = addedSize,
+                psImmediateParents =
+                  maybe [] S.toList $ M.lookup spName immediateParents
               }
   where
     calculateEnvSize :: StoreEnv IntermediatePathStats -> Int
@@ -78,6 +84,19 @@ mkFinalEnv env =
         & calculateRefsSize
     calculateRefsSize :: (Functor f, Foldable f) => f (StorePath a b) -> Int
     calculateRefsSize = sum . fmap spSize
+    calculateImmediateParents ::
+      (Foldable f) =>
+      f (StorePath StoreName b) ->
+      M.Map StoreName (S.Set StoreName)
+    calculateImmediateParents =
+      foldl'
+        ( \m StorePath {spName, spRefs} ->
+            M.unionWith
+              (<>)
+              m
+              (M.fromList (map (\r -> (r, S.singleton spName)) spRefs))
+        )
+        M.empty
 
 calculatePathStats :: StoreEnv () -> StoreEnv PathStats
 calculatePathStats = mkFinalEnv . mkIntermediateEnv (const True)
