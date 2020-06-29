@@ -1,5 +1,17 @@
 # nixdu
 
+Interactively browse dependency graph of your Nix derivations, [ncdu]() style.
+
+[![asciicast](https://asciinema.org/a/MPS11kUGkUrBYFCppLgHNe0wj.svg)](https://asciinema.org/a/MPS11kUGkUrBYFCppLgHNe0wj)
+
+## Installation
+
 ```
-nix run -f https://github.com/utdemir/nixdu/archive/master.tar.gz exe -c nixdu ~/.nix-profile
+nix-env -i https://github.com/utdemir/nixdu/archive/master.tar.gz -A exe
+```
+
+## Usage
+
+```
+nixdu [STORE PATHS]
 ```
