@@ -1,6 +1,6 @@
 # nixdu
 
-Interactively browse dependency graph of your Nix derivations, [ncdu]() style.
+Interactively browse the dependency graph of your Nix derivations, [ncdu]() style.
 
 [![asciicast](https://asciinema.org/a/MPS11kUGkUrBYFCppLgHNe0wj.svg)](https://asciinema.org/a/MPS11kUGkUrBYFCppLgHNe0wj)
 
