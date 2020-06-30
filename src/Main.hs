@@ -2,34 +2,23 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Main where
 
+import Protolude
 import qualified Brick as B
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
-import Control.Concurrent (forkIO)
-import Control.DeepSeq (rnf)
-import Control.Exception (evaluate)
-import Control.Monad (filterM, void)
-import Data.Foldable (foldl')
-import Data.Function ((&))
-import Data.Function (on)
-import Data.Functor.Identity (Identity (Identity, runIdentity))
+import Control.Monad (fail)
 import qualified Data.HashMap.Strict as HM
-import Data.List (findIndex)
-import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe (fromMaybe, mapMaybe)
-import Data.Ord (Down (Down))
-import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import qualified Data.Text as T
 import qualified Graphics.Vty as V
 import PathStats
 import System.Directory (canonicalizePath, doesDirectoryExist, getHomeDirectory)
-import System.Environment (getArgs)
 import System.FilePath ((</>))
 import qualified System.HrfSize as HRF
 
@@ -101,7 +90,7 @@ renderList isFocused list =
           let color =
                 if null spRefs
                   then B.withAttr attrTerminal
-                  else id
+                  else identity
            in color $
                 B.padRight B.Max (B.txt $ storeNameToShortText spName)
                   B.<+> B.padLeft
@@ -335,7 +324,7 @@ selectedPaths AppEnv {aePrevPane, aeCurrPane, aeParents} =
           (fmap snd . B.listSelectedElement)
           (aePrevPane : aeParents)
    in case B.listSelectedElement aeCurrPane of
-        Nothing -> error "invariant violation: no selected element"
+        Nothing -> panic "invariant violation: no selected element"
         Just (_, p) -> p :| parents
 
 selectPath :: NonEmpty Path -> AppEnv -> AppEnv
@@ -392,7 +381,7 @@ main = do
             "/var/run/current-system"
           ]
       case roots of
-        [] -> fail "No store path given."
+        [] -> panic "No store path given."
         p : ps -> return $ p :| ps
   storePaths <- mapM canonicalizePath paths
   names <- flip mapM storePaths $ \sp ->

@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
 module PathStats
@@ -11,15 +12,10 @@ module PathStats
   )
 where
 
-import Control.DeepSeq (NFData)
-import Data.Foldable (foldl')
-import Data.Function ((&))
-import Data.List (transpose)
-import Data.List.NonEmpty (NonEmpty ((:|)))
+import Protolude
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Lazy as M
 import qualified Data.Set as S
-import GHC.Generics (Generic)
 import StorePath
 
 data IntermediatePathStats = IntermediatePathStats
@@ -72,7 +68,7 @@ mkFinalEnv env =
     calculateEnvSize :: StoreEnv IntermediatePathStats -> Int
     calculateEnvSize env =
       seGetRoots env
-        & NE.toList
+        & toList
         & map
           ( \sp@StorePath {spName, spPayload} ->
               M.insert

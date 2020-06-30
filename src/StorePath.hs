@@ -8,6 +8,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module StorePath
   ( StoreName (..),
@@ -24,25 +25,14 @@ module StorePath
   )
 where
 
-import Control.Applicative ((<|>))
-import Control.DeepSeq (NFData)
-import Control.Monad (guard)
-import Control.Monad.Trans.State (State, execState, gets, modify)
+import Protolude
 import Data.Aeson ((.:), FromJSON (..), Value (..), decode)
-import Data.Foldable (foldl')
-import Data.Function ((&))
 import qualified Data.HashMap.Strict as HM
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as HS
-import Data.Hashable (Hashable)
-import qualified Data.List.NonEmpty as NE
-import Data.List.NonEmpty (NonEmpty)
-import Data.Maybe (fromMaybe)
-import Data.Text (Text)
-import qualified Data.Text as T
-import GHC.Generics (Generic)
 import System.FilePath.Posix (splitDirectories)
 import System.Process.Typed (proc, readProcessStdout_)
+import Control.Monad (fail)
 
 --------------------------------------------------------------------------------
 
@@ -52,14 +42,14 @@ newtype StoreName = StoreName Text
 mkStoreName :: FilePath -> Maybe StoreName
 mkStoreName path =
   case splitDirectories path of
-    "/" : "nix" : "store" : name : _ -> Just . StoreName $ T.pack name
+    "/" : "nix" : "store" : name : _ -> Just . StoreName $ toS name
     _ -> Nothing
 
 storeNameToText :: StoreName -> Text
 storeNameToText (StoreName n) = n
 
 storeNameToPath :: StoreName -> FilePath
-storeNameToPath (StoreName sn) = "/nix/store/" ++ T.unpack sn
+storeNameToPath (StoreName sn) = "/nix/store/" <> toS sn
 
 --------------------------------------------------------------------------------
 
@@ -81,7 +71,7 @@ mkStorePaths names = do
         ( proc
             "nix"
             ( ["path-info", "--recursive", "--json"]
-                ++ map storeNameToPath (NE.toList names)
+                ++ map storeNameToPath (toList names)
             )
         )
       >>= maybe (fail "Failed parsing nix path-info output.") return
@@ -129,12 +119,12 @@ mkStoreEnv names = do
 seUnsafeLookup :: StoreEnv a -> StoreName -> StorePath StoreName a
 seUnsafeLookup StoreEnv {sePaths} name =
   fromMaybe
-    (error $ "invariant violation, StoreName not found: " ++ show name)
+    (panic $ "invariant violation, StoreName not found: " <> show name)
     (HM.lookup name sePaths)
 
 seGetRoots :: StoreEnv a -> NonEmpty (StorePath StoreName a)
 seGetRoots env@StoreEnv {seRoots} =
-  NE.map (seUnsafeLookup env) seRoots
+  map (seUnsafeLookup env) seRoots
 
 seFetchRefs ::
   StoreEnv a ->
@@ -170,7 +160,7 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
   where
     unsafeLookup k m =
       fromMaybe
-        (error $ "invariant violation: name doesn't exists: " ++ show k)
+        (panic $ "invariant violation: name doesn't exists: " <> show k)
         (HM.lookup k m)
     go ::
       StoreName ->
