@@ -16,7 +16,9 @@ usage :: Text
 usage =
   unlines
     [ "Usage: nixdu [paths] [-h|--help]",
-      "  Paths default to $HOME/.nix-profile and /var/run/current-system."
+      "  Paths default to $HOME/.nix-profile and /var/run/current-system.",
+      "Keybindings:",
+      unlines . map ("  " <>) . lines $ helpText
     ]
 
 usageAndFail :: Text -> IO a

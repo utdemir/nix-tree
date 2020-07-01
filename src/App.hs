@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module App where
+module App (run, helpText) where
 
 import qualified Brick as B
 import qualified Brick.Widgets.Border as B
@@ -214,6 +214,17 @@ renderInfoPane env =
                   <> T.intercalate ", " (map storeNameToShortText immediateParents)
           ]
 
+helpText :: Text
+helpText =
+  T.intercalate
+    "\n"
+    [ "hjkl/Arrow Keys : Navigate",
+      "q/Esc:          : Quit / close modal",
+      "w               : Open why-depends mode",
+      "i               : Toggle modeline",
+      "?               : Show help"
+    ]
+
 renderHelpModal :: B.Widget a
 renderHelpModal =
   B.txt helpText
@@ -221,16 +232,6 @@ renderHelpModal =
     & B.hLimitPercent 90
     & B.vLimitPercent 60
     & B.centerLayer
-  where
-    helpText =
-      T.intercalate
-        "\n"
-        [ "hjkl/Arrow Keys : Navigate",
-          "q/Esc:          : Quit / close modal",
-          "w               : Open why-depends mode",
-          "i               : Toggle modeline",
-          "?               : Show help"
-        ]
 
 renderWhyDependsModal ::
   B.GenericList Widgets Seq (NonEmpty (Path s)) ->
