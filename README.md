@@ -13,5 +13,14 @@ nix-env -i https://github.com/utdemir/nixdu/archive/master.tar.gz -A exe
 ## Usage
 
 ```
-nixdu [STORE PATHS]
+$ nixdu --help
+nixdu --help
+Usage: nixdu [paths] [-h|--help]
+  Paths default to $HOME/.nix-profile and /var/run/current-system.
+Keybindings:
+  hjkl/Arrow Keys : Navigate
+  q/Esc:          : Quit / close modal
+  w               : Open why-depends mode
+  i               : Toggle modeline
+  ?               : Show help
 ```
