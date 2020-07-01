@@ -6,19 +6,20 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module StorePath
   ( StoreName (..),
-    mkStoreName,
     storeNameToPath,
     storeNameToText,
+    storeNameToShortText,
     StorePath (..),
     StoreEnv (..),
-    mkStoreEnv,
-    seUnsafeLookup,
+    withStoreEnv,
+    seLookup,
     seGetRoots,
     seBottomUp,
     seFetchRefs,
@@ -30,40 +31,44 @@ import Data.Aeson ((.:), FromJSON (..), Value (..), decode)
 import qualified Data.HashMap.Strict as HM
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as HS
+import qualified Data.Text as T
 import Protolude
 import System.FilePath.Posix (splitDirectories)
 import System.Process.Typed (proc, readProcessStdout_)
 
 --------------------------------------------------------------------------------
 
-newtype StoreName = StoreName Text
+newtype StoreName s = StoreName Text
   deriving newtype (Show, Eq, Ord, Hashable, NFData)
 
-mkStoreName :: FilePath -> Maybe StoreName
+mkStoreName :: FilePath -> Maybe (StoreName a)
 mkStoreName path =
   case splitDirectories path of
     "/" : "nix" : "store" : name : _ -> Just . StoreName $ toS name
     _ -> Nothing
 
-storeNameToText :: StoreName -> Text
+storeNameToText :: StoreName a -> Text
 storeNameToText (StoreName n) = n
 
-storeNameToPath :: StoreName -> FilePath
+storeNameToPath :: StoreName a -> FilePath
 storeNameToPath (StoreName sn) = "/nix/store/" <> toS sn
+
+storeNameToShortText :: StoreName a -> Text
+storeNameToShortText = T.drop 1 . T.dropWhile (/= '-') . storeNameToText
 
 --------------------------------------------------------------------------------
 
-data StorePath ref payload = StorePath
-  { spName :: StoreName,
+data StorePath s ref payload = StorePath
+  { spName :: StoreName s,
     spSize :: Int,
     spRefs :: [ref],
     spPayload :: payload
   }
   deriving (Show, Eq, Ord, Functor, Generic)
 
-instance (NFData a, NFData b) => NFData (StorePath a b)
+instance (NFData a, NFData b) => NFData (StorePath s a b)
 
-mkStorePaths :: NonEmpty StoreName -> IO [StorePath StoreName ()]
+mkStorePaths :: NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
 mkStorePaths names = do
   infos <-
     decode @[NixPathInfoResult]
@@ -99,38 +104,55 @@ mkStorePaths names = do
 
 --------------------------------------------------------------------------------
 
-data StoreEnv payload = StoreEnv
-  { sePaths :: HashMap StoreName (StorePath StoreName payload),
-    seRoots :: NonEmpty StoreName
+data StoreEnv s payload = StoreEnv
+  { sePaths :: HashMap (StoreName s) (StorePath s (StoreName s) payload),
+    seRoots :: NonEmpty (StoreName s)
   }
   deriving (Functor, Generic, NFData)
 
-mkStoreEnv :: NonEmpty StoreName -> IO (StoreEnv ())
-mkStoreEnv names = do
-  paths <- mkStorePaths names
-  return $
-    StoreEnv
-      ( paths
-          & map (\p@StorePath {spName} -> (spName, p))
-          & HM.fromList
-      )
-      names
+withStoreEnv ::
+  forall m a.
+  MonadIO m =>
+  NonEmpty FilePath ->
+  (forall s. StoreEnv s () -> m a) ->
+  m (Either [FilePath] a)
+withStoreEnv fnames cb = do
+  let names' =
+        fnames
+          & toList
+          & map (\f -> maybe (Left f) Right (mkStoreName f))
+          & partitionEithers
 
-seUnsafeLookup :: StoreEnv a -> StoreName -> StorePath StoreName a
-seUnsafeLookup StoreEnv {sePaths} name =
+  case names' of
+    (errs@(_ : _), _) -> return (Left errs)
+    ([], xs) -> case nonEmpty xs of
+      Nothing -> panic "invariant violation"
+      Just names -> do
+        paths <- liftIO $ mkStorePaths names
+        let env =
+              StoreEnv
+                ( paths
+                    & map (\p@StorePath {spName} -> (spName, p))
+                    & HM.fromList
+                )
+                names
+        Right <$> cb env
+
+seLookup :: StoreEnv s a -> StoreName s -> StorePath s (StoreName s) a
+seLookup StoreEnv {sePaths} name =
   fromMaybe
     (panic $ "invariant violation, StoreName not found: " <> show name)
     (HM.lookup name sePaths)
 
-seGetRoots :: StoreEnv a -> NonEmpty (StorePath StoreName a)
+seGetRoots :: StoreEnv s a -> NonEmpty (StorePath s (StoreName s) a)
 seGetRoots env@StoreEnv {seRoots} =
-  map (seUnsafeLookup env) seRoots
+  map (seLookup env) seRoots
 
 seFetchRefs ::
-  StoreEnv a ->
-  (StoreName -> Bool) ->
-  NonEmpty StoreName ->
-  [StorePath StoreName a]
+  StoreEnv s a ->
+  (StoreName s -> Bool) ->
+  NonEmpty (StoreName s) ->
+  [StorePath s (StoreName s) a]
 seFetchRefs env predicate =
   fst
     . foldl'
@@ -141,17 +163,17 @@ seFetchRefs env predicate =
       | HS.member name visited = (acc, visited)
       | not (predicate name) = (acc, visited)
       | otherwise =
-        let sp@StorePath {spRefs} = seUnsafeLookup env name
+        let sp@StorePath {spRefs} = seLookup env name
          in foldl'
               (\(acc', visited') name' -> go acc' visited' name')
               (sp : acc, HS.insert name visited)
               spRefs
 
 seBottomUp ::
-  forall a b.
-  (StorePath (StorePath StoreName b) a -> b) ->
-  StoreEnv a ->
-  StoreEnv b
+  forall s a b.
+  (StorePath s (StorePath s (StoreName s) b) a -> b) ->
+  StoreEnv s a ->
+  StoreEnv s b
 seBottomUp f StoreEnv {sePaths, seRoots} =
   StoreEnv
     { sePaths = snd $ execState (mapM_ go seRoots) (sePaths, HM.empty),
@@ -163,12 +185,12 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
         (panic $ "invariant violation: name doesn't exists: " <> show k)
         (HM.lookup k m)
     go ::
-      StoreName ->
+      StoreName s ->
       State
-        ( HashMap StoreName (StorePath StoreName a),
-          HashMap StoreName (StorePath StoreName b)
+        ( HashMap (StoreName s) (StorePath s (StoreName s) a),
+          HashMap (StoreName s) (StorePath s (StoreName s) b)
         )
-        (StorePath StoreName b)
+        (StorePath s (StoreName s) b)
     go name = do
       bs <- gets snd
       case name `HM.lookup` bs of

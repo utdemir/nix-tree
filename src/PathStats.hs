@@ -18,21 +18,21 @@ import qualified Data.Set as S
 import Protolude
 import StorePath
 
-data IntermediatePathStats = IntermediatePathStats
-  { ipsAllRefs :: M.Map StoreName (StorePath StoreName ())
+data IntermediatePathStats s = IntermediatePathStats
+  { ipsAllRefs :: M.Map (StoreName s) (StorePath s (StoreName s) ())
   }
 
-data PathStats = PathStats
+data PathStats s = PathStats
   { psTotalSize :: !Int,
     psAddedSize :: !Int,
-    psImmediateParents :: [StoreName]
+    psImmediateParents :: [StoreName s]
   }
   deriving (Show, Generic, NFData)
 
 mkIntermediateEnv ::
-  (StoreName -> Bool) ->
-  StoreEnv () ->
-  StoreEnv IntermediatePathStats
+  (StoreName s -> Bool) ->
+  StoreEnv s () ->
+  StoreEnv s (IntermediatePathStats s)
 mkIntermediateEnv pred =
   seBottomUp $ \curr ->
     IntermediatePathStats
@@ -47,7 +47,7 @@ mkIntermediateEnv pred =
             )
       }
 
-mkFinalEnv :: StoreEnv IntermediatePathStats -> StoreEnv PathStats
+mkFinalEnv :: StoreEnv s (IntermediatePathStats s) -> StoreEnv s (PathStats s)
 mkFinalEnv env =
   let totalSize = calculateEnvSize env
       immediateParents = calculateImmediateParents (sePaths env)
@@ -65,7 +65,7 @@ mkFinalEnv env =
                   maybe [] S.toList $ M.lookup spName immediateParents
               }
   where
-    calculateEnvSize :: StoreEnv IntermediatePathStats -> Int
+    calculateEnvSize :: StoreEnv s (IntermediatePathStats s) -> Int
     calculateEnvSize env =
       seGetRoots env
         & toList
@@ -78,12 +78,12 @@ mkFinalEnv env =
           )
         & M.unions
         & calculateRefsSize
-    calculateRefsSize :: (Functor f, Foldable f) => f (StorePath a b) -> Int
+    calculateRefsSize :: (Functor f, Foldable f) => f (StorePath s a b) -> Int
     calculateRefsSize = sum . fmap spSize
     calculateImmediateParents ::
       (Foldable f) =>
-      f (StorePath StoreName b) ->
-      M.Map StoreName (S.Set StoreName)
+      f (StorePath s (StoreName s) b) ->
+      M.Map (StoreName s) (S.Set (StoreName s))
     calculateImmediateParents =
       foldl'
         ( \m StorePath {spName, spRefs} ->
@@ -94,10 +94,10 @@ mkFinalEnv env =
         )
         M.empty
 
-calculatePathStats :: StoreEnv () -> StoreEnv PathStats
+calculatePathStats :: StoreEnv s () -> StoreEnv s (PathStats s)
 calculatePathStats = mkFinalEnv . mkIntermediateEnv (const True)
 
-whyDepends :: StoreEnv a -> StoreName -> [NonEmpty (StorePath StoreName a)]
+whyDepends :: StoreEnv s a -> StoreName s -> [NonEmpty (StorePath s (StoreName s) a)]
 whyDepends env name =
   seBottomUp
     ( \curr ->
@@ -115,7 +115,7 @@ whyDepends env name =
     & concat
     & map NE.reverse
 
-markRouteTo :: StoreName -> StoreEnv a -> StoreEnv (Bool, a)
+markRouteTo :: StoreName s -> StoreEnv s a -> StoreEnv s (Bool, a)
 markRouteTo name = seBottomUp $ \sp@StorePath {spName, spRefs} ->
   ( spName == name || any (fst . spPayload) spRefs,
     spPayload sp

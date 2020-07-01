@@ -10,7 +10,6 @@ import qualified Brick as B
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
-import Control.Monad (fail)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Sequence as S
@@ -29,31 +28,28 @@ data Widgets
   | WidgetWhyDepends
   deriving (Show, Eq, Ord)
 
-data Modal
+data Modal s
   = ModalHelp
-  | ModalWhyDepends (B.GenericList Widgets Seq (NonEmpty Path))
+  | ModalWhyDepends (B.GenericList Widgets Seq (NonEmpty (Path s)))
 
-data AppEnv = AppEnv
-  { aeActualStoreEnv :: StoreEnv PathStats,
-    aePrevPane :: List,
-    aeCurrPane :: List,
-    aeNextPane :: List,
-    aeParents :: [List],
-    aeOpenModal :: Maybe Modal,
+data AppEnv s = AppEnv
+  { aeActualStoreEnv :: StoreEnv s (PathStats s),
+    aePrevPane :: List s,
+    aeCurrPane :: List s,
+    aeNextPane :: List s,
+    aeParents :: [List s],
+    aeOpenModal :: Maybe (Modal s),
     aeShowInfoPane :: Bool
   }
 
-type Path = StorePath StoreName PathStats
+type Path s = StorePath s (StoreName s) (PathStats s)
 
-type List = B.GenericList Widgets Seq Path
+type List s = B.GenericList Widgets Seq (Path s)
 
 attrTerminal :: B.AttrName
 attrTerminal = "terminal"
 
-storeNameToShortText :: StoreName -> T.Text
-storeNameToShortText = T.drop 1 . T.dropWhile (/= '-') . storeNameToText
-
-run :: StoreEnv PathStats -> IO ()
+run :: StoreEnv s (PathStats s) -> IO ()
 run env = void $ B.defaultMain app appEnv
   where
     appEnv =
@@ -77,7 +73,7 @@ run env = void $ B.defaultMain app appEnv
 
 renderList ::
   Bool ->
-  List ->
+  List s ->
   B.Widget Widgets
 renderList isFocused list =
   B.renderList
@@ -108,7 +104,7 @@ renderList isFocused list =
     isFocused
     list
 
-app :: B.App AppEnv () Widgets
+app :: B.App (AppEnv s) () Widgets
 app =
   B.App
     { B.appDraw = \env@AppEnv {aeOpenModal} ->
@@ -181,7 +177,7 @@ app =
           ]
     }
 
-renderMainScreen :: AppEnv -> B.Widget Widgets
+renderMainScreen :: AppEnv s -> B.Widget Widgets
 renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeShowInfoPane} =
   (B.joinBorders . B.border)
     ( B.hBox
@@ -194,7 +190,7 @@ renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeShowInfoPane}
     )
     B.<=> if aeShowInfoPane then renderInfoPane env else renderModeline env
 
-renderModeline :: AppEnv -> B.Widget Widgets
+renderModeline :: AppEnv s -> B.Widget Widgets
 renderModeline env =
   let selected = selectedPath env
    in B.txt $
@@ -205,7 +201,7 @@ renderModeline env =
             "Closure Size: " <> prettySize (psTotalSize $ spPayload selected)
           ]
 
-renderInfoPane :: AppEnv -> B.Widget Widgets
+renderInfoPane :: AppEnv s -> B.Widget Widgets
 renderInfoPane env =
   let selected = selectedPath env
       immediateParents = psImmediateParents $ spPayload selected
@@ -241,7 +237,7 @@ renderHelpModal =
         ]
 
 renderWhyDependsModal ::
-  B.GenericList Widgets Seq (NonEmpty Path) ->
+  B.GenericList Widgets Seq (NonEmpty (Path s)) ->
   B.Widget Widgets
 renderWhyDependsModal l =
   B.renderList renderDepends True l
@@ -258,7 +254,7 @@ renderWhyDependsModal l =
         & fmap (storeNameToShortText . spName)
         & T.intercalate " → "
 
-showWhyDepends :: AppEnv -> AppEnv
+showWhyDepends :: AppEnv s -> AppEnv s
 showWhyDepends env@AppEnv {aeActualStoreEnv} =
   env
     { aeOpenModal =
@@ -271,14 +267,14 @@ showWhyDepends env@AppEnv {aeActualStoreEnv} =
                   (fromMaybe 0 $ (((==) `on` fmap spName) route) `S.findIndexL` xs)
     }
 
-move :: (List -> List) -> AppEnv -> AppEnv
+move :: (List s -> List s) -> AppEnv s -> AppEnv s
 move f = runIdentity . moveF (Identity . f)
 
-moveF :: Applicative f => (List -> f List) -> AppEnv -> f AppEnv
+moveF :: Applicative f => (List s -> f (List s)) -> AppEnv s -> f (AppEnv s)
 moveF f env@AppEnv {aeCurrPane} =
   repopulateNextPane . (\p -> env {aeCurrPane = p}) <$> f aeCurrPane
 
-moveLeft :: AppEnv -> AppEnv
+moveLeft :: AppEnv s -> AppEnv s
 moveLeft env@AppEnv {aeParents = []} = env
 moveLeft env@AppEnv {aePrevPane, aeCurrPane, aeParents = parent : grandparents} =
   env
@@ -288,7 +284,7 @@ moveLeft env@AppEnv {aePrevPane, aeCurrPane, aeParents = parent : grandparents} 
       aeNextPane = aeCurrPane {B.listName = WidgetNextPane}
     }
 
-moveRight :: AppEnv -> AppEnv
+moveRight :: AppEnv s -> AppEnv s
 moveRight env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeParents}
   | null (B.listElements aeNextPane) = env
   | otherwise =
@@ -299,7 +295,7 @@ moveRight env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeParents}
       }
       & repopulateNextPane
 
-repopulateNextPane :: AppEnv -> AppEnv
+repopulateNextPane :: AppEnv s -> AppEnv s
 repopulateNextPane env@AppEnv {aeActualStoreEnv, aeNextPane} =
   let ref = selectedPath env
    in env
@@ -307,17 +303,17 @@ repopulateNextPane env@AppEnv {aeActualStoreEnv, aeNextPane} =
             B.listReplace
               ( S.sortOn (Down . psTotalSize . spPayload)
                   . S.fromList
-                  . map (seUnsafeLookup aeActualStoreEnv)
+                  . map (seLookup aeActualStoreEnv)
                   $ spRefs ref
               )
               (Just 0)
               aeNextPane
         }
 
-selectedPath :: AppEnv -> Path
+selectedPath :: AppEnv s -> Path s
 selectedPath = NE.head . selectedPaths
 
-selectedPaths :: AppEnv -> NonEmpty Path
+selectedPaths :: AppEnv s -> NonEmpty (Path s)
 selectedPaths AppEnv {aePrevPane, aeCurrPane, aeParents} =
   let parents =
         mapMaybe
@@ -327,7 +323,7 @@ selectedPaths AppEnv {aePrevPane, aeCurrPane, aeParents} =
         Nothing -> panic "invariant violation: no selected element"
         Just (_, p) -> p :| parents
 
-selectPath :: NonEmpty Path -> AppEnv -> AppEnv
+selectPath :: NonEmpty (Path s) -> AppEnv s -> AppEnv s
 selectPath path env
   | (spName <$> path) == (spName <$> selectedPaths env) =
     env
@@ -336,7 +332,7 @@ selectPath path env@AppEnv {aeActualStoreEnv} =
       lists =
         NE.scanl
           ( \(_, prev) curr ->
-              ( map (seUnsafeLookup aeActualStoreEnv) $
+              ( map (seLookup aeActualStoreEnv) $
                   spRefs prev,
                 curr
               )
@@ -384,32 +380,36 @@ main = do
         [] -> panic "No store path given."
         p : ps -> return $ p :| ps
   storePaths <- mapM canonicalizePath paths
-  names <- flip mapM storePaths $ \sp ->
-    case mkStoreName sp of
-      Nothing -> fail $ "Not a store path: " ++ show sp
-      Just n -> return n
-  env <- calculatePathStats <$> mkStoreEnv names
+  ret <- withStoreEnv storePaths $ \env' -> do
+    let env = calculatePathStats env'
 
-  -- Small hack to evaluate the tree branches with a breadth-first
-  -- traversal in the background
-  let go _ [] = return ()
-      go remaining nodes = do
-        let (newRemaining, foundNodes) =
-              foldl'
-                ( \(nr, fs) n ->
-                    ( HM.delete n nr,
-                      HM.lookup n nr : fs
-                    )
-                )
-                (remaining, [])
-                nodes
-        evaluate $ rnf foundNodes
-        go
-          newRemaining
-          (concatMap (maybe [] spRefs) foundNodes)
-  _ <- forkIO $ go (sePaths env) (NE.toList $ seRoots env)
+    -- Small hack to evaluate the tree branches with a breadth-first
+    -- traversal in the background
+    let go _ [] = return ()
+        go remaining nodes = do
+          let (newRemaining, foundNodes) =
+                foldl'
+                  ( \(nr, fs) n ->
+                      ( HM.delete n nr,
+                        HM.lookup n nr : fs
+                      )
+                  )
+                  (remaining, [])
+                  nodes
+          evaluate $ rnf foundNodes
+          go
+            newRemaining
+            (concatMap (maybe [] spRefs) foundNodes)
+    _ <- forkIO $ go (sePaths env) (NE.toList $ seRoots env)
 
-  run env
+    run env
+
+  case ret of
+    Right () -> return ()
+    Left err ->
+      mapM_
+        (\fp -> hPutStrLn stderr $ "Not a store path: " <> fp)
+        err
 
 -- Utils
 
