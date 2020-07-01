@@ -1,6 +1,7 @@
+{ system ? builtins.currentSystem }:
 let
   sources = import ./nix/sources.nix;
-  pkgs = import sources.nixpkgs { };
+  pkgs = import sources.nixpkgs { inherit system; };
 
   gitignore = extra:
     pkgs.nix-gitignore.gitignoreSourcePure ([ ./.gitignore ] ++ extra);
