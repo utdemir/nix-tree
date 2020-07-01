@@ -10,7 +10,7 @@ Interactively browse the dependency graph of your Nix derivations.
 nix-env -iA nixdu -f https://github.com/utdemir/nixdu/archive/master.tar.gz
 ```
 
-A nixpkgs overlay is also provided on `overlay.nix`, that can be used
+A nixpkgs overlay is also provided via `overlay.nix`, that can be used
 with tools like [home-manager][]:
 
 ```nix
