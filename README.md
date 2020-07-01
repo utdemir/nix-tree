@@ -7,7 +7,7 @@ Interactively browse the dependency graph of your Nix derivations.
 ## Installation
 
 ```
-nix-env -i https://github.com/utdemir/nixdu/archive/master.tar.gz -A exe
+nix-env -iA exe -f https://github.com/utdemir/nixdu/archive/master.tar.gz
 ```
 
 ## Usage
