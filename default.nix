@@ -1,7 +1,6 @@
 let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs {
-    inherit system;
     overlays = [ (import ./overlay.nix) ];
   };
 
