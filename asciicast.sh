@@ -4,7 +4,8 @@ set -o errexit
 tmpdir="$(mktemp -d)"
 trap "rm -rf '$tmpdir'" EXIT
 
-storePath=$(nix-build -A nixdu --no-out-link)
+nixduPath=$(nix-build -A exe --no-out-link)
+storePath=$(nix-build -E '(import (import ./nix/sources.nix).nixpkgs {}).git')
 
 TMUX="tmux -S "$tmpdir/tmux.sock""
 echo "$TMUX attach -r"
@@ -13,7 +14,7 @@ sleep 5
 
 $TMUX resize-window -x 200 -y 40
 sleep 1
-$TMUX send-keys "export PATH=$storePath/bin:\$PATH" ENTER
+$TMUX send-keys "export PATH=$nixduPath/bin:\$PATH" ENTER
 sleep 1
 $TMUX send-keys "asciinema rec \"$tmpdir/demo.cast\"" ENTER
 sleep 2
@@ -21,30 +22,31 @@ $TMUX send-keys "nixdu $storePath"
 sleep 1
 $TMUX send-keys Enter
 sleep 2
-$TMUX send-keys Right
-sleep 1
-$TMUX send-keys Down
-sleep 1
-$TMUX send-keys Right
-sleep 1
-$TMUX send-keys Down
-sleep 1
-$TMUX send-keys Down
-sleep 1
+
+# navigate to openssl
+for i in Right Down Down Down Right Down Down; do
+  $TMUX send-keys $i
+  sleep 1
+done
+
+
 $TMUX send-keys w
 sleep 2
-$TMUX send-keys Up
+
+$TMUX send-keys Down
 sleep 1
-$TMUX send-keys Up
-sleep 1
-$TMUX send-keys Up
-sleep 1
+
 $TMUX send-keys Enter
 sleep 1
+
 $TMUX send-keys Left
-sleep 5
+sleep 4
+
 $TMUX send-keys q
 sleep 1
+$TMUX send-keys 'nixdu --help' ENTER
+sleep 2
+
 $TMUX send-keys 'exit' ENTER
 sleep 1
 $TMUX kill-session
