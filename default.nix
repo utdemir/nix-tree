@@ -1,46 +1,25 @@
 let
   sources = import ./nix/sources.nix;
-  pkgs = import sources.nixpkgs { };
-
-  gitignore = extra:
-    pkgs.nix-gitignore.gitignoreSourcePure ([ ./.gitignore ] ++ extra);
-
-  myHaskellPackages = pkgs.haskellPackages.override {
-    overrides = hself: hsuper: {
-      "nixdu" =
-        hself.callCabal2nix
-          "nixdu"
-          (gitignore [ "asciicast.sh" ] ./.) { };
-    };
+  pkgs = import sources.nixpkgs {
+    overlays = [ (import ./overlay.nix) ];
   };
 
-  shell = myHaskellPackages.shellFor {
+  shell = pkgs.haskellPackages.shellFor {
     packages = p: [
       p."nixdu"
     ];
     buildInputs = with pkgs.haskellPackages; [
-      myHaskellPackages.cabal-install
+      cabal-install
       ghcid
       ormolu
       hlint
       steeloverseer
-      (import sources.niv { }).niv
       pkgs.nixpkgs-fmt
     ];
     withHoogle = true;
   };
-
-  exe = pkgs.haskell.lib.justStaticExecutables (myHaskellPackages."nixdu");
-
-  docker = pkgs.dockerTools.buildImage {
-    name = "nixdu";
-    config.Cmd = [ "${exe}/bin/nixdu" ];
-  };
 in
 {
   inherit shell;
-  inherit exe;
-  inherit docker;
-  inherit myHaskellPackages;
-  "nixdu" = myHaskellPackages."nixdu";
+  inherit (pkgs) nixdu;
 }

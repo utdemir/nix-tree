@@ -7,7 +7,19 @@ Interactively browse the dependency graph of your Nix derivations.
 ## Installation
 
 ```
-nix-env -iA exe -f https://github.com/utdemir/nixdu/archive/master.tar.gz
+nix-env -iA nixdu -f https://github.com/utdemir/nixdu/archive/master.tar.gz
+```
+
+A nixpkgs overlay is also provided via `overlay.nix`, that can be used
+with tools like [home-manager][]:
+
+```nix
+nixpkgs.overlays = [
+  (let url = https://github.com/utdemir/nixdu/archive/master.tar.gz;
+    in import "${builtins.fetchTarball url}/overlay.nix" {})
+];
+
+home.packages = [ pkgs.nixdu ];
 ```
 
 ## Usage
@@ -24,3 +36,5 @@ Keybindings:
   i               : Toggle modeline
   ?               : Show help
 ```
+
+[home-manager]: https://github.com/rycee/home-manager
