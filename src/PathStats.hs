@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module PathStats
   ( PathStats (..),
@@ -12,10 +12,10 @@ module PathStats
   )
 where
 
-import Protolude
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Lazy as M
 import qualified Data.Set as S
+import Protolude
 import StorePath
 
 data IntermediatePathStats = IntermediatePathStats

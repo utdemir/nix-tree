@@ -25,14 +25,14 @@ module StorePath
   )
 where
 
-import Protolude
+import Control.Monad (fail)
 import Data.Aeson ((.:), FromJSON (..), Value (..), decode)
 import qualified Data.HashMap.Strict as HM
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as HS
+import Protolude
 import System.FilePath.Posix (splitDirectories)
 import System.Process.Typed (proc, readProcessStdout_)
-import Control.Monad (fail)
 
 --------------------------------------------------------------------------------
 

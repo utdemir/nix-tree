@@ -6,7 +6,6 @@
 
 module Main where
 
-import Protolude
 import qualified Brick as B
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as B
@@ -18,6 +17,7 @@ import qualified Data.Sequence as S
 import qualified Data.Text as T
 import qualified Graphics.Vty as V
 import PathStats
+import Protolude
 import System.Directory (canonicalizePath, doesDirectoryExist, getHomeDirectory)
 import System.FilePath ((</>))
 import qualified System.HrfSize as HRF
