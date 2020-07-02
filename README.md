@@ -1,5 +1,7 @@
 # nix-tree
 
+![Build Status](https://github.com/utdemir/nix-tree/workflows/nix-build/badge.svg)
+
 Interactively browse the dependency graph of your Nix derivations.
 
 [![asciicast](https://asciinema.org/a/ahDveBL1gs5t36z1myePtrKpR.svg)](https://asciinema.org/a/ahDveBL1gs5t36z1myePtrKpR)
