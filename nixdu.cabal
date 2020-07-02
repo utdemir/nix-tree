@@ -1,14 +1,16 @@
 name:                nixdu
 synopsis:            Interactively browse a Nix store paths dependencies
-version:             0.0.1.0
+description:         A terminal curses application to browse a Nix store paths dependencies
+version:             0.1.0.0
 homepage:            https://github.com/utdemir/nixdu
 license:             BSD3
 author:              Utku Demir
 maintainer:          Utku Demir
 copyright:           Utku Demir
-category:            Data.Nix
+category:            Language.Nix
 build-type:          Simple
 cabal-version:       >=1.10
+extra-source-files:  README.md
 
 executable nixdu
   main-is:            Main.hs
