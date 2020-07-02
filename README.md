@@ -38,3 +38,7 @@ Keybindings:
 ```
 
 [home-manager]: https://github.com/rycee/home-manager
+
+# Related tools
+
+* [nix-du](https://github.com/symphorien/nix-du)
