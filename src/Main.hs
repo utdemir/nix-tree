@@ -15,7 +15,7 @@ import System.FilePath ((</>))
 usage :: Text
 usage =
   unlines
-    [ "Usage: nixdu [paths] [-h|--help]",
+    [ "Usage: nix-tree [paths] [-h|--help]",
       "  Paths default to $HOME/.nix-profile and /var/run/current-system.",
       "Keybindings:",
       unlines . map ("  " <>) . lines $ helpText

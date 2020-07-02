@@ -1,13 +1,13 @@
-# nixdu
+# nix-tree
 
 Interactively browse the dependency graph of your Nix derivations.
 
-[![asciicast](https://asciinema.org/a/XVVOPQuU6ZQ0vGuO8ejr4JB11.svg)](https://asciinema.org/a/XVVOPQuU6ZQ0vGuO8ejr4JB11)
+[![asciicast](https://asciinema.org/a/ahDveBL1gs5t36z1myePtrKpR.svg)](https://asciinema.org/a/ahDveBL1gs5t36z1myePtrKpR)
 
 ## Installation
 
 ```
-nix-env -iA nixdu -f https://github.com/utdemir/nixdu/archive/master.tar.gz
+nix-env -iA nix-tree -f https://github.com/utdemir/nix-tree/archive/master.tar.gz
 ```
 
 A nixpkgs overlay is also provided via `overlay.nix`, that can be used
@@ -15,19 +15,19 @@ with tools like [home-manager][]:
 
 ```nix
 nixpkgs.overlays = [
-  (let url = https://github.com/utdemir/nixdu/archive/master.tar.gz;
+  (let url = https://github.com/utdemir/nix-tree/archive/master.tar.gz;
     in import "${builtins.fetchTarball url}/overlay.nix" {})
 ];
 
-home.packages = [ pkgs.nixdu ];
+home.packages = [ pkgs.nix-tree ];
 ```
 
 ## Usage
 
 ```
-$ nixdu --help
-nixdu --help
-Usage: nixdu [paths] [-h|--help]
+$ nix-tree --help
+nix-tree --help
+Usage: nix-tree [paths] [-h|--help]
   Paths default to $HOME/.nix-profile and /var/run/current-system.
 Keybindings:
   hjkl/Arrow Keys : Navigate
@@ -42,3 +42,5 @@ Keybindings:
 # Related tools
 
 * [nix-du](https://github.com/symphorien/nix-du)
+* [nix-query-tree-viewer](https://github.com/cdepillabout/nix-query-tree-viewer)
+* [nix-visualize](https://github.com/craigmbooth/nix-visualize)

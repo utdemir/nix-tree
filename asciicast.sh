@@ -4,7 +4,7 @@ set -o errexit
 tmpdir="$(mktemp -d)"
 trap "rm -rf '$tmpdir'" EXIT
 
-nixduPath=$(nix-build -A exe --no-out-link)
+nixTreePath=$(nix-build -A nix-tree --no-out-link)
 storePath=$(nix-build -E '(import (import ./nix/sources.nix).nixpkgs {}).git')
 
 TMUX="tmux -S "$tmpdir/tmux.sock""
@@ -14,11 +14,11 @@ sleep 5
 
 $TMUX resize-window -x 200 -y 40
 sleep 1
-$TMUX send-keys "export PATH=$nixduPath/bin:\$PATH" ENTER
+$TMUX send-keys "export PATH=$nixTreePath/bin:\$PATH" ENTER
 sleep 1
 $TMUX send-keys "asciinema rec \"$tmpdir/demo.cast\"" ENTER
 sleep 2
-$TMUX send-keys "nixdu $storePath"
+$TMUX send-keys "nix-tree  $storePath"
 sleep 1
 $TMUX send-keys Enter
 sleep 2
@@ -44,7 +44,7 @@ sleep 4
 
 $TMUX send-keys q
 sleep 1
-$TMUX send-keys 'nixdu --help' ENTER
+$TMUX send-keys 'nix-tree --help' ENTER
 sleep 2
 
 $TMUX send-keys 'exit' ENTER

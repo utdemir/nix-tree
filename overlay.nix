@@ -2,9 +2,9 @@ self: super: {
   haskellPackages =
     super.haskellPackages.override {
       overrides = hself: hsuper: {
-        nixdu =
+        nix-tree =
           hself.callCabal2nix
-            "nixdu"
+            "nix-tree"
             (self.nix-gitignore.gitignoreSourcePure
               [ ./.gitignore "asciicast.sh" "*.nix" ]
               ./.
@@ -12,7 +12,10 @@ self: super: {
       };
     };
 
-  nixdu =
+  nix-tree =
     self.haskell.lib.justStaticExecutables
-      self.haskellPackages.nixdu;
+      self.haskellPackages.nix-tree;
+
+  nixdu =
+    self.lib.warn "nixdu is renamed to nix-tree." self.nix-tree;
 }

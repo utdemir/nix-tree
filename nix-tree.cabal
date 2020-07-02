@@ -1,8 +1,8 @@
-name:                nixdu
+name:                nix-tree
 synopsis:            Interactively browse a Nix store paths dependencies
 description:         A terminal curses application to browse a Nix store paths dependencies
 version:             0.1.0.0
-homepage:            https://github.com/utdemir/nixdu
+homepage:            https://github.com/utdemir/nix-tree
 license:             BSD3
 author:              Utku Demir
 maintainer:          Utku Demir
@@ -12,7 +12,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 extra-source-files:  README.md
 
-executable nixdu
+executable nix-tree
   main-is:            Main.hs
   hs-source-dirs:     src
   default-language:   Haskell2010

@@ -6,7 +6,7 @@ let
 
   shell = pkgs.haskellPackages.shellFor {
     packages = p: [
-      p."nixdu"
+      p."nix-tree"
     ];
     buildInputs = with pkgs.haskellPackages; [
       cabal-install
@@ -21,5 +21,5 @@ let
 in
 {
   inherit shell;
-  inherit (pkgs) nixdu;
+  inherit (pkgs) nix-tree nixdu;
 }
