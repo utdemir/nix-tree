@@ -1,12 +1,22 @@
 # nix-tree
 
 ![Build Status](https://github.com/utdemir/nix-tree/workflows/nix-build/badge.svg)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/nix-tree.svg)](https://repology.org/project/nix-tree/versions)
+
 
 Interactively browse the dependency graph of your Nix derivations.
 
 [![asciicast](https://asciinema.org/a/ahDveBL1gs5t36z1myePtrKpR.svg)](https://asciinema.org/a/ahDveBL1gs5t36z1myePtrKpR)
 
 ## Installation
+
+From nixpkgs-unstable:
+
+```
+nix-env -iA nix-tree -f https://github.com/nixos/nixpkgs/archive/nixpkgs-unstable.tar.gz
+```
+
+Development version:
 
 ```
 nix-env -iA nix-tree -f https://github.com/utdemir/nix-tree/archive/master.tar.gz
@@ -23,6 +33,8 @@ nixpkgs.overlays = [
 
 home.packages = [ pkgs.nix-tree ];
 ```
+
+
 
 ## Usage
 
