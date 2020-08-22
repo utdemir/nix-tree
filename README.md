@@ -47,8 +47,8 @@ Keybindings:
   hjkl/Arrow Keys : Navigate
   q/Esc:          : Quit / close modal
   w               : Open why-depends mode
-  i               : Toggle modeline
   /               : Open search mode
+  i               : Toggle modeline
   ?               : Show help
 ```
 
