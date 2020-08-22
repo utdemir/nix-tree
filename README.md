@@ -48,6 +48,7 @@ Keybindings:
   q/Esc:          : Quit / close modal
   w               : Open why-depends mode
   i               : Toggle modeline
+  /               : Open search mode
   ?               : Show help
 ```
 

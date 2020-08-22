@@ -19,6 +19,7 @@ module StorePath
     StoreEnv (..),
     withStoreEnv,
     seLookup,
+    seAll,
     seGetRoots,
     seBottomUp,
     seFetchRefs,
@@ -26,9 +27,9 @@ module StorePath
 where
 
 import Control.Monad (fail)
-import Data.Aeson ((.:), FromJSON (..), Value (..), decode)
-import qualified Data.HashMap.Strict as HM
+import Data.Aeson (FromJSON (..), Value (..), decode, (.:))
 import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import Protolude
@@ -142,6 +143,11 @@ seLookup StoreEnv {sePaths} name =
   fromMaybe
     (panic $ "invariant violation, StoreName not found: " <> show name)
     (HM.lookup name sePaths)
+
+seAll :: StoreEnv s a -> NonEmpty (StorePath s (StoreName s) a)
+seAll StoreEnv {sePaths} = case HM.elems sePaths of
+  [] -> panic "invariant violation: no paths"
+  (x : xs) -> x :| xs
 
 seGetRoots :: StoreEnv s a -> NonEmpty (StorePath s (StoreName s) a)
 seGetRoots env@StoreEnv {seRoots} =

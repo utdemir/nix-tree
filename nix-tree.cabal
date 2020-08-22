@@ -19,6 +19,7 @@ executable nix-tree
   other-modules:      PathStats
                       StorePath
                       App
+                      InvertedIndex
   ghc-options:        -Wall -fno-warn-name-shadowing -threaded -O2 -threaded
   build-depends:      base >= 4.11 && < 5
                     , aeson

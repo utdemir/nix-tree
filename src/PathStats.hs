@@ -1,13 +1,14 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module PathStats
   ( PathStats (..),
     calculatePathStats,
-    markRouteTo,
     whyDepends,
+    shortestPathTo,
     module StorePath,
   )
 where
@@ -42,8 +43,8 @@ mkIntermediateEnv pred =
                 [ (spName, const () <$> sp)
                   | sp@StorePath {spName} <- spRefs curr,
                     pred spName
-                ]
-                : map (ipsAllRefs . spPayload) (spRefs curr)
+                ] :
+              map (ipsAllRefs . spPayload) (spRefs curr)
             )
       }
 
@@ -115,8 +116,28 @@ whyDepends env name =
     & concat
     & map NE.reverse
 
-markRouteTo :: StoreName s -> StoreEnv s a -> StoreEnv s (Bool, a)
-markRouteTo name = seBottomUp $ \sp@StorePath {spName, spRefs} ->
-  ( spName == name || any (fst . spPayload) spRefs,
-    spPayload sp
-  )
+-- TODO: This can be precomputed.
+shortestPathTo :: StoreEnv s a -> StoreName s -> NonEmpty (StorePath s (StoreName s) a)
+shortestPathTo env name =
+  seBottomUp
+    ( \curr ->
+        let currOut = curr {spRefs = spName <$> spRefs curr}
+         in if spName curr == name
+              then Just (1 :: Int, currOut :| [])
+              else
+                spRefs curr
+                  & fmap spPayload
+                  & catMaybes
+                  & \case
+                    [] -> Nothing
+                    xs -> case minimumBy (comparing fst) xs of
+                      (c, p) -> Just (c + 1, currOut NE.<| p)
+    )
+    env
+    & seGetRoots
+    & fmap spPayload
+    & NE.toList
+    & catMaybes
+    & minimumBy (comparing fst)
+    & snd
+    & NE.reverse

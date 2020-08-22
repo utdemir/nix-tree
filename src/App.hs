@@ -11,8 +11,10 @@ import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Sequence as S
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Graphics.Vty as V
+import InvertedIndex
 import PathStats
 import Protolude
 import qualified System.HrfSize as HRF
@@ -22,14 +24,17 @@ data Widgets
   | WidgetCurrPane
   | WidgetNextPane
   | WidgetWhyDepends
+  | WidgetSearch
   deriving (Show, Eq, Ord)
 
 data Modal s
   = ModalHelp
   | ModalWhyDepends (B.GenericList Widgets Seq (NonEmpty (Path s)))
+  | ModalSearch Text Text (B.GenericList Widgets Seq (Path s))
 
 data AppEnv s = AppEnv
   { aeActualStoreEnv :: StoreEnv s (PathStats s),
+    aeInvertedIndex :: InvertedIndex,
     aePrevPane :: List s,
     aeCurrPane :: List s,
     aeNextPane :: List s,
@@ -46,26 +51,31 @@ attrTerminal :: B.AttrName
 attrTerminal = "terminal"
 
 run :: StoreEnv s (PathStats s) -> IO ()
-run env = void $ B.defaultMain app appEnv
+run env = void . B.defaultMain app =<< appEnv
   where
-    appEnv =
-      AppEnv
-        { aeActualStoreEnv =
-            env,
-          aePrevPane =
-            B.list WidgetPrevPane S.empty 0,
-          aeCurrPane =
-            B.list WidgetCurrPane (S.fromList . NE.toList $ seGetRoots env) 0,
-          aeNextPane =
-            B.list WidgetNextPane S.empty 0,
-          aeParents =
-            [],
-          aeOpenModal =
-            Nothing,
-          aeShowInfoPane =
-            True
-        }
-        & repopulateNextPane
+    appEnv = do
+      let ii = iiFromList . toList . map (storeNameToText . spName) $ seAll env
+      _ <- forkIO $ evaluate (rnf ii)
+      return $
+        AppEnv
+          { aeActualStoreEnv =
+              env,
+            aeInvertedIndex =
+              ii,
+            aePrevPane =
+              B.list WidgetPrevPane S.empty 0,
+            aeCurrPane =
+              B.list WidgetCurrPane (S.fromList . NE.toList $ seGetRoots env) 0,
+            aeNextPane =
+              B.list WidgetNextPane S.empty 0,
+            aeParents =
+              [],
+            aeOpenModal =
+              Nothing,
+            aeShowInfoPane =
+              True
+          }
+          & repopulateNextPane
 
 renderList ::
   Bool ->
@@ -107,7 +117,8 @@ app =
         [ case aeOpenModal of
             Nothing -> B.emptyWidget
             Just ModalHelp -> renderHelpModal
-            Just (ModalWhyDepends l) -> renderWhyDependsModal l,
+            Just (ModalWhyDepends l) -> renderWhyDependsModal l
+            Just (ModalSearch l r xs) -> renderSearchModal l r xs,
           renderMainScreen env
         ],
       B.appChooseCursor = \_ -> const Nothing,
@@ -121,16 +132,18 @@ app =
             B.continue s {aeOpenModal = Just ModalHelp}
           (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) ->
             B.continue $ showWhyDepends s
+          (B.VtyEvent (V.EvKey (V.KChar '/') []), Nothing) ->
+            B.continue $ showAndUpdateSearch "" "" s
           (B.VtyEvent (V.EvKey (V.KChar 'i') []), Nothing) ->
             B.continue $ s {aeShowInfoPane = not (aeShowInfoPane s)}
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'h', V.KLeft] ->
               B.continue $ moveLeft s
           (B.VtyEvent (V.EvKey k []), Nothing)
-            | k `elem` [V.KChar 'j', V.KDown] ->
+            | k `elem` [V.KChar 'j', V.KDown, V.KChar '\t'] ->
               B.continue $ move B.listMoveDown s
           (B.VtyEvent (V.EvKey k []), Nothing)
-            | k `elem` [V.KChar 'k', V.KUp] ->
+            | k `elem` [V.KChar 'k', V.KUp, V.KBackTab] ->
               B.continue $ move B.listMoveUp s
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'l', V.KRight] ->
@@ -145,10 +158,10 @@ app =
               B.continue s {aeOpenModal = Nothing}
           -- why-depends modal
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
-            | k `elem` [V.KChar 'j', V.KDown] ->
+            | k `elem` [V.KChar 'j', V.KDown, V.KChar '\t'] ->
               B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveDown l)}
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
-            | k `elem` [V.KChar 'k', V.KUp] ->
+            | k `elem` [V.KChar 'k', V.KUp, V.KBackTab] ->
               B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveUp l)}
           (B.VtyEvent (V.EvKey V.KPageUp []), Just (ModalWhyDepends l)) ->
             B.listMovePageUp l >>= \l' ->
@@ -161,7 +174,39 @@ app =
              in case B.listSelectedElement l of
                   Nothing -> B.continue closed
                   Just (_, path) -> B.continue $ selectPath path closed
-          -- otherwise
+          -- search modal
+          (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
+            | k `elem` [V.KDown, V.KChar '\t'] ->
+              B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveDown xs)}
+          (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
+            | k `elem` [V.KUp, V.KBackTab] ->
+              B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveUp xs)}
+          (B.VtyEvent (V.EvKey V.KLeft []), Just (ModalSearch l r xs)) ->
+            B.continue
+              s
+                { aeOpenModal =
+                    Just $ ModalSearch (T.dropEnd 1 l) (T.takeEnd 1 l <> r) (B.listMoveUp xs)
+                }
+          (B.VtyEvent (V.EvKey V.KRight []), Just (ModalSearch l r xs)) ->
+            B.continue
+              s
+                { aeOpenModal =
+                    Just $ ModalSearch (l <> T.take 1 r) (T.drop 1 r) (B.listMoveUp xs)
+                }
+          (B.VtyEvent (V.EvKey (V.KChar c) []), Just (ModalSearch l r _))
+            | c `Set.member` allowedSearchChars ->
+              B.continue (showAndUpdateSearch (l <> T.singleton c) r s)
+          (B.VtyEvent (V.EvKey (V.KBS) []), Just (ModalSearch l r _)) ->
+            B.continue (showAndUpdateSearch (T.dropEnd 1 l) r s)
+          (B.VtyEvent (V.EvKey V.KEnter []), Just (ModalSearch _ _ xs)) ->
+            let closed = s {aeOpenModal = Nothing}
+             in case B.listSelectedElement xs of
+                  Nothing -> B.continue closed
+                  Just (_, path) ->
+                    B.continue $
+                      selectPath
+                        (shortestPathTo (aeActualStoreEnv s) (spName path))
+                        closed
           _ ->
             B.continue s,
       B.appStartEvent = \s -> return s,
@@ -172,6 +217,17 @@ app =
             (attrTerminal, B.fg V.blue)
           ]
     }
+  where
+    allowedSearchChars :: Set Char
+    allowedSearchChars =
+      Set.fromList
+        ( mconcat
+            [ ['a' .. 'z'],
+              ['A' .. 'Z'],
+              ['0' .. '9'],
+              "+-.=?_"
+            ]
+        )
 
 renderMainScreen :: AppEnv s -> B.Widget Widgets
 renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeShowInfoPane} =
@@ -214,6 +270,14 @@ renderInfoPane env =
                   <> T.intercalate ", " (map storeNameToShortText immediateParents)
           ]
 
+renderModal :: Text -> B.Widget a -> B.Widget a
+renderModal title widget =
+  widget
+    & B.borderWithLabel (B.txt title)
+    & B.hLimitPercent 90
+    & B.vLimitPercent 60
+    & B.centerLayer
+
 helpText :: Text
 helpText =
   T.intercalate
@@ -221,27 +285,19 @@ helpText =
     [ "hjkl/Arrow Keys : Navigate",
       "q/Esc:          : Quit / close modal",
       "w               : Open why-depends mode",
+      "/               : Open search mode",
       "i               : Toggle modeline",
       "?               : Show help"
     ]
 
 renderHelpModal :: B.Widget a
-renderHelpModal =
-  B.txt helpText
-    & B.borderWithLabel (B.txt "Help")
-    & B.hLimitPercent 90
-    & B.vLimitPercent 60
-    & B.centerLayer
+renderHelpModal = renderModal "Help" (B.txt helpText)
 
 renderWhyDependsModal ::
   B.GenericList Widgets Seq (NonEmpty (Path s)) ->
   B.Widget Widgets
 renderWhyDependsModal l =
-  B.renderList renderDepends True l
-    & B.hLimitPercent 80
-    & B.vLimitPercent 60
-    & B.borderWithLabel (B.txt "why-depends")
-    & B.centerLayer
+  renderModal "why-depends" (B.renderList renderDepends True l)
   where
     renderDepends _ =
       B.txt . pathsToText
@@ -263,6 +319,26 @@ showWhyDepends env@AppEnv {aeActualStoreEnv} =
                 & B.listMoveTo
                   (fromMaybe 0 $ (((==) `on` fmap spName) route) `S.findIndexL` xs)
     }
+
+renderSearchModal :: Text -> Text -> B.GenericList Widgets Seq (Path s) -> B.Widget Widgets
+renderSearchModal left right list =
+  renderModal "Search" window
+  where
+    window =
+      B.txt left B.<+> B.txt "|" B.<+> B.txt right
+        B.<=> B.hBorder
+        B.<=> renderList True list
+
+showAndUpdateSearch :: Text -> Text -> AppEnv s -> AppEnv s
+showAndUpdateSearch left right env@AppEnv {aeActualStoreEnv, aeInvertedIndex} =
+  env {aeOpenModal = Just $ ModalSearch left right results}
+  where
+    results =
+      let xs =
+            iiSearch (left <> right) aeInvertedIndex
+              & (S.fromList . Set.toList)
+              & fmap (seLookup aeActualStoreEnv . StoreName)
+       in B.list WidgetSearch xs 1
 
 move :: (List s -> List s) -> AppEnv s -> AppEnv s
 move f = runIdentity . moveF (Identity . f)

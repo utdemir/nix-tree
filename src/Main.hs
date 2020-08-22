@@ -69,6 +69,7 @@ main = do
           go
             newRemaining
             (concatMap (maybe [] spRefs) foundNodes)
+
     _ <- forkIO $ go (sePaths env) (toList $ seRoots env)
 
     run env
