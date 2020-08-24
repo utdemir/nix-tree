@@ -20,6 +20,7 @@ executable nix-tree
                       StorePath
                       App
                       InvertedIndex
+                      Paths_nix_tree
   ghc-options:        -Wall -fno-warn-name-shadowing -threaded -O2 -threaded
   build-depends:      base >= 4.11 && < 5
                     , aeson
