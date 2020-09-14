@@ -152,11 +152,10 @@ app =
             B.continue =<< moveF B.listMovePageUp s
           (B.VtyEvent (V.EvKey V.KPageDown []), Nothing) ->
             B.continue =<< moveF B.listMovePageDown s
-          -- modals
-          (B.VtyEvent (V.EvKey k []), Just _)
+          -- why-depends modal
+          (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
             | k `elem` [V.KChar 'q', V.KEsc] ->
               B.continue s {aeOpenModal = Nothing}
-          -- why-depends modal
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
             | k `elem` [V.KChar 'j', V.KDown, V.KChar '\t'] ->
               B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveDown l)}
@@ -175,6 +174,8 @@ app =
                   Nothing -> B.continue closed
                   Just (_, path) -> B.continue $ selectPath path closed
           -- search modal
+          (B.VtyEvent (V.EvKey V.KEsc []), Just (ModalSearch _ _ _)) ->
+              B.continue s {aeOpenModal = Nothing}
           (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
             | k `elem` [V.KDown, V.KChar '\t'] ->
               B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveDown xs)}
