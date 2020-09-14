@@ -1,8 +1,7 @@
 # nix-tree
 
 ![Build Status](https://github.com/utdemir/nix-tree/workflows/nix-build/badge.svg)
-[![Packaging status](https://repology.org/badge/vertical-allrepos/nix-tree.svg)](https://repology.org/project/nix-tree/versions)
-
+[![Packaging status](https://repology.org/badge/vertical-allrepos/haskell:nix-tree.svg)](https://repology.org/project/haskell:nix-tree/versions)
 
 Interactively browse the dependency graph of your Nix derivations.
 
