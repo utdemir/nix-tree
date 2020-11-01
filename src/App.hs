@@ -175,7 +175,7 @@ app =
                   Just (_, path) -> B.continue $ selectPath path closed
           -- search modal
           (B.VtyEvent (V.EvKey V.KEsc []), Just (ModalSearch _ _ _)) ->
-              B.continue s {aeOpenModal = Nothing}
+            B.continue s {aeOpenModal = Nothing}
           (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
             | k `elem` [V.KDown, V.KChar '\t'] ->
               B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveDown xs)}
