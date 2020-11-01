@@ -7,9 +7,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - uses: cachix/install-nix-action@v8
-    - uses: cachix/cachix-action@v5
+      with:
+          # Nix Flakes doesn't work on shallow clones
+          fetch-depth: 0
+    - uses: cachix/install-nix-action@v11
+      with:
+        install_url: https://github.com/numtide/nix-flakes-installer/releases/download/nix-3.0pre20200820_4d77513/install
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+    - uses: cachix/cachix-action@v6
       with:
         name: utdemir
-        file: default.nix
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+    - run: nix build
+    - run: nix develop --command 'echo' 'ok.'

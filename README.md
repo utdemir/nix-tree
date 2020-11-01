@@ -9,31 +9,17 @@ Interactively browse the dependency graph of your Nix derivations.
 
 ## Installation
 
-From nixpkgs-unstable:
+Stable version:
 
 ```
-nix-env -iA nix-tree -f https://github.com/nixos/nixpkgs/archive/nixpkgs-unstable.tar.gz
+nix-env -i nix-tree
 ```
 
-Development version:
+Development version (requires Nix with flake support):
 
 ```
-nix-env -iA nix-tree -f https://github.com/utdemir/nix-tree/archive/master.tar.gz
+nix profile install github:utdemir/nix-tree
 ```
-
-A nixpkgs overlay is also provided via `overlay.nix`, that can be used
-with tools like [home-manager][]:
-
-```nix
-nixpkgs.overlays = [
-  (let url = https://github.com/utdemir/nix-tree/archive/master.tar.gz;
-    in import "${builtins.fetchTarball url}/overlay.nix" {})
-];
-
-home.packages = [ pkgs.nix-tree ];
-```
-
-
 
 ## Usage
 
@@ -52,6 +38,13 @@ Keybindings:
 ```
 
 [home-manager]: https://github.com/rycee/home-manager
+
+## Hacking
+
+All contributions, issues and feature requests are welcome.
+
+To hack on it, simply run `nix develop` (which requires a Nix version
+with flakes support) and use `cabal` as usual.
 
 # Related tools
 
