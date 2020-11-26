@@ -43,8 +43,7 @@ Keybindings:
 
 All contributions, issues and feature requests are welcome.
 
-To hack on it, simply run `nix develop` (which requires a Nix version
-with flakes support) and use `cabal` as usual.
+To hack on it, simply run `nix-shell` (or `nix develop`) and use `cabal` as usual.
 
 # Related tools
 
