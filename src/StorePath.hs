@@ -31,6 +31,8 @@ import Data.Aeson (FromJSON (..), Value (..), decode, (.:))
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
+import Data.List (partition)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import Protolude
 import System.FilePath.Posix (splitDirectories)
@@ -70,19 +72,30 @@ instance (NFData a, NFData b) => NFData (StorePath s a b)
 
 mkStorePaths :: NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
 mkStorePaths names = do
-  infos <-
-    decode @[NixPathInfoResult]
-      <$> readProcessStdout_
-        ( proc
-            "nix"
-            ( ["path-info", "--recursive", "--json"]
-                ++ map storeNameToPath (toList names)
-            )
-        )
-      >>= maybe (fail "Failed parsing nix path-info output.") return
-      >>= mapM assertValidInfo
-  mapM infoToStorePath infos
+  let (derivations, outputs) =
+        partition
+          (\i -> ".drv" `T.isSuffixOf` storeNameToText i)
+          (NE.toList names)
+  (++)
+    <$> maybe (return []) (getPathInfo False) (NE.nonEmpty outputs)
+    <*> maybe (return []) (getPathInfo True) (NE.nonEmpty derivations)
   where
+    getPathInfo :: Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
+    getPathInfo isDrv names = do
+      infos <-
+        decode @[NixPathInfoResult]
+          <$> readProcessStdout_
+            ( proc
+                "nix"
+                ( ["path-info", "--recursive", "--json"]
+                    ++ (if isDrv then ["--derivation"] else [])
+                    ++ map storeNameToPath (toList names)
+                )
+            )
+          >>= maybe (fail "Failed parsing nix path-info output.") return
+          >>= mapM assertValidInfo
+      mapM infoToStorePath infos
+
     infoToStorePath NixPathInfo {npiPath, npiNarSize, npiReferences} = do
       name <- mkStoreNameIO npiPath
       refs <- filter (/= name) <$> mapM mkStoreNameIO npiReferences
