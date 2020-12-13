@@ -43,7 +43,7 @@
             hlint
             pkgs.nixpkgs-fmt
           ];
-          withHoogle = true;
+          withHoogle = false;
         };
       }
     );
