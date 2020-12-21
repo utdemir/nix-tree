@@ -4,6 +4,7 @@ description:         A terminal curses application to browse a Nix store paths d
 version:             0.1.2.0
 homepage:            https://github.com/utdemir/nix-tree
 license:             BSD3
+license-file:        LICENSE
 author:              Utku Demir
 maintainer:          Utku Demir
 copyright:           Utku Demir
