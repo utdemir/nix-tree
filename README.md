@@ -39,6 +39,25 @@ Keybindings:
 
 [home-manager]: https://github.com/rycee/home-manager
 
+### Tips
+
+`nix-build` prints built paths to stdout, which can be piped conveniently
+with `| xargs -o nix-tree`. Examples:
+
+```bash
+# Output of a local derivation
+nix-build . --no-out-link | xargs -o nix-tree
+
+# Build time dependencies (passing a `.drv` path)
+nix-instantiate --no-out-link | xargs -o nix-tree
+
+# Dependencies from shell.nix
+nix-build shell.nix -A inputDerivation | xargs -o nix-tree
+
+# All outputs of a derivation in nixpkgs:
+nix-build '<nixpkgs>' -A openssl.all --no-out-link | xargs -o nix-tree
+```
+
 ## Hacking
 
 All contributions, issues and feature requests are welcome.
