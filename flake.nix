@@ -26,8 +26,7 @@
             self.haskellPackages.nix-tree;
       };
     in
-    { overlay = (import nixpkgs {}).lib.warn "nix-tree is on nixpkgs now, this overlay will be deprecated in near future." overlay; }
-      // flake-utils.lib.eachDefaultSystem (system:
+    { inherit overlay; } // flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
       in
