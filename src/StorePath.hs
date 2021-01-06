@@ -28,6 +28,7 @@ where
 
 import Control.Monad (fail)
 import Data.Aeson (FromJSON (..), Value (..), decode, (.:))
+import qualified Data.ByteString.Lazy as BL
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
@@ -72,14 +73,26 @@ instance (NFData a, NFData b) => NFData (StorePath s a b)
 
 mkStorePaths :: NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
 mkStorePaths names = do
+  -- See: https://github.com/utdemir/nix-tree/issues/12
+  --
+  -- > In Nix < 2.4, when you pass a .drv to path-info, it returns information about the store
+  -- > derivation. However, when you do the same in 2.4, it "resolves" it and works on
+  -- > the output of given derivation; to actually work on the derivation you need to pass
+  -- > --derivation.
+  isAtLeastNix24 <- (>= Just "2.4") <$> getNixVersion
   let (derivations, outputs) =
         partition
           (\i -> ".drv" `T.isSuffixOf` storeNameToText i)
           (NE.toList names)
   (++)
     <$> maybe (return []) (getPathInfo False) (NE.nonEmpty outputs)
-    <*> maybe (return []) (getPathInfo True) (NE.nonEmpty derivations)
+    <*> maybe (return []) (getPathInfo (True && isAtLeastNix24)) (NE.nonEmpty derivations)
   where
+    getNixVersion :: IO (Maybe Text)
+    getNixVersion = do
+      out <- decodeUtf8 . BL.toStrict <$> readProcessStdout_ (proc "nix" ["--version"])
+      return . lastMay $ T.splitOn " " out
+
     getPathInfo :: Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
     getPathInfo isDrv names = do
       infos <-

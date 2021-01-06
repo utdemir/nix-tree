@@ -27,6 +27,7 @@ executable nix-tree
                     , aeson
                     , async
                     , brick
+                    , bytestring
                     , containers
                     , deepseq
                     , directory
