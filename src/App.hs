@@ -208,6 +208,11 @@ app =
                       selectPath
                         (shortestPathTo (aeActualStoreEnv s) (spName path))
                         closed
+          -- help modal
+          (B.VtyEvent (V.EvKey k []), Just ModalHelp)
+            | k `elem` [V.KChar 'q', V.KEsc] ->
+            B.continue s {aeOpenModal = Nothing}
+          -- ignore otherwise
           _ ->
             B.continue s,
       B.appStartEvent = \s -> return s,
