@@ -80,22 +80,22 @@ mkStorePaths names = do
       out <- decodeUtf8 . BL.toStrict <$> readProcessStdout_ (proc "nix" ["--version"])
       return . lastMay $ T.splitOn " " out
 
-    getPathInfo :: Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
-    getPathInfo isDrv names = do
-      infos <-
-        decode @[NixPathInfoResult]
-          <$> readProcessStdout_
-            ( proc
-                "nix"
-                ( ["path-info", "--recursive", "--json"]
-                    ++ (if isDrv then ["--derivation"] else [])
-                    ++ map storeNameToPath (toList names)
-                )
+getPathInfo :: Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
+getPathInfo isDrv names = do
+  infos <-
+    decode @[NixPathInfoResult]
+      <$> readProcessStdout_
+        ( proc
+            "nix"
+            ( ["path-info", "--recursive", "--json"]
+                ++ (if isDrv then ["--derivation"] else [])
+                ++ map storeNameToPath (toList names)
             )
-          >>= maybe (fail "Failed parsing nix path-info output.") return
-          >>= mapM assertValidInfo
-      mapM infoToStorePath infos
-
+        )
+      >>= maybe (fail "Failed parsing nix path-info output.") return
+      >>= mapM assertValidInfo
+  mapM infoToStorePath infos
+  where
     infoToStorePath NixPathInfo {npiPath, npiNarSize, npiReferences} = do
       name <- mkStoreNameIO npiPath
       refs <- filter (/= name) <$> mapM mkStoreNameIO npiReferences
@@ -111,7 +111,8 @@ mkStorePaths names = do
         (fail $ "Failed parsing Nix store path: " ++ show p)
         return
         (mkStoreName p)
-    assertValidInfo (NixPathInfoValid pi) = return pi
+
+    assertValidInfo (NixPathInfoValid pathinfo) = return pathinfo
     assertValidInfo (NixPathInfoInvalid path) =
       fail $ "Invalid path: " ++ path ++ ". Inconsistent /nix/store or ongoing GC."
 
@@ -210,8 +211,8 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
         )
         (StorePath s (StoreName s) b)
     go name = do
-      bs <- gets snd
-      case name `HM.lookup` bs of
+      processed <- gets snd
+      case name `HM.lookup` processed of
         Just sp -> return sp
         Nothing -> do
           sp@StorePath {spName, spRefs} <- unsafeLookup name <$> gets fst

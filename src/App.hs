@@ -75,7 +75,7 @@ renderList ::
   Bool ->
   List s ->
   B.Widget Widgets
-renderList isFocused list =
+renderList isFocused =
   B.renderList
     ( \_
        StorePath
@@ -102,7 +102,6 @@ renderList isFocused list =
                     )
     )
     isFocused
-    list
 
 app :: B.App (AppEnv s) () Widgets
 app =
@@ -321,13 +320,13 @@ showWhyDepends env@AppEnv {aeActualStoreEnv} =
     }
 
 renderSearchModal :: Text -> Text -> B.GenericList Widgets Seq (Path s) -> B.Widget Widgets
-renderSearchModal left right list =
+renderSearchModal left right l =
   renderModal "Search" window
   where
     window =
       B.txt left B.<+> B.txt "|" B.<+> B.txt right
         B.<=> B.hBorder
-        B.<=> renderList True list
+        B.<=> renderList True l
 
 showAndUpdateSearch :: Text -> Text -> AppEnv s -> AppEnv s
 showAndUpdateSearch left right env@AppEnv {aeActualStoreEnv, aeInvertedIndex} =

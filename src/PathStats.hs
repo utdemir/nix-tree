@@ -27,7 +27,7 @@ mkIntermediateEnv ::
   (StoreName s -> Bool) ->
   StoreEnv s () ->
   StoreEnv s (IntermediatePathStats s)
-mkIntermediateEnv pred =
+mkIntermediateEnv env =
   seBottomUp $ \curr ->
     IntermediatePathStats
       { ipsAllRefs =
@@ -35,7 +35,7 @@ mkIntermediateEnv pred =
             ( M.fromList
                 [ (spName, const () <$> sp)
                   | sp@StorePath {spName} <- spRefs curr,
-                    pred spName
+                    env spName
                 ] :
               map (ipsAllRefs . spPayload) (spRefs curr)
             )
@@ -60,8 +60,8 @@ mkFinalEnv env =
               }
   where
     calculateEnvSize :: StoreEnv s (IntermediatePathStats s) -> Int
-    calculateEnvSize env =
-      seGetRoots env
+    calculateEnvSize e =
+      seGetRoots e
         & toList
         & map
           ( \sp@StorePath {spName, spPayload} ->
