@@ -3,5 +3,5 @@
 set -o xtrace
 set -o errexit
 
-fd -e hs -X ormolu --mode inplace {}
+fd -e hs -X ormolu -o -XTypeApplications --mode inplace {}
 nixpkgs-fmt flake.nix
