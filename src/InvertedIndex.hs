@@ -54,15 +54,15 @@ setToMap :: v -> Set k -> Map k v
 setToMap v = Map.fromDistinctAscList . map (,v) . Set.toAscList
 
 unigramsOf :: Text -> Set Char
-unigramsOf txt = Set.fromList $ Text.unpack txt
+unigramsOf = Set.fromList . Text.unpack . Text.toLower
 
 bigramsOf :: Text -> Set (Char, Char)
-bigramsOf txt = case Text.unpack txt of
+bigramsOf txt = case Text.unpack (Text.toLower txt) of
   p1@(_ : p2) -> Set.fromList $ zip p1 p2
   _ -> Set.empty
 
 trigramsOf :: Text -> Set (Char, Char, Char)
-trigramsOf txt = case Text.unpack txt of
+trigramsOf txt = case Text.unpack (Text.toLower txt) of
   p1@(_ : p2@(_ : p3)) -> Set.fromList $ zip3 p1 p2 p3
   _ -> Set.empty
 
@@ -73,10 +73,12 @@ iiSearch txt InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams}
   | Text.length txt == 2 = using bigramsOf iiBigrams
   | otherwise = using trigramsOf iiTrigrams
   where
+    lowerTxt = Text.toLower txt
     using :: Ord a => (Text -> Set a) -> Map a (Set Text) -> Set Text
     using getGrams m =
-      Map.intersection m (setToMap () (getGrams txt))
+      Map.intersection m (setToMap () (getGrams lowerTxt))
         & Map.elems
         & \case
           [] -> Set.empty
           (x : xs) -> foldl' Set.intersection x xs
+        & Set.filter (lowerTxt `Text.isInfixOf`)
