@@ -36,23 +36,15 @@ common common-options
                       NamedFieldPuns
                       RankNTypes
                       ScopedTypeVariables
-  mixins:             base hiding (Prelude)
-                    , protolude (Protolude as Prelude)
-  build-depends:      base
-                    , protolude
-
-executable nix-tree
-  import:             common-options
-  main-is:            Main.hs
-  hs-source-dirs:     src
-  default-language:   Haskell2010
   other-modules:      PathStats
                       StorePath
                       App
                       InvertedIndex
                       Paths_nix_tree
-  ghc-options:        -Wall -fno-warn-name-shadowing -threaded -threaded
-  build-depends:      base >= 4.11 && < 5
+  mixins:             base hiding (Prelude)
+                    , protolude (Protolude as Prelude)
+  build-depends:      base
+                    , protolude
                     , aeson
                     , brick
                     , bytestring
@@ -68,3 +60,19 @@ executable nix-tree
                     , typed-process
                     , unordered-containers
                     , vty
+
+executable nix-tree
+  import:             common-options
+  main-is:            Main.hs
+  hs-source-dirs:     src
+  default-language:   Haskell2010
+  build-depends:      base >= 4.11 && < 5
+
+test-suite nix-tree-tests
+  import:           common-options
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   test/ src/
+  main-is:          Test.hs
+  ghc-options:      -Wno-unused-packages
+  build-depends:    base >=4.11 && < 5
+                  , hedgehog
