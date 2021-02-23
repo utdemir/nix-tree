@@ -41,6 +41,7 @@ common common-options
                       App
                       InvertedIndex
                       Paths_nix_tree
+  autogen-modules:    Paths_nix_tree
   mixins:             base hiding (Prelude)
                     , protolude (Protolude as Prelude)
   build-depends:      base
