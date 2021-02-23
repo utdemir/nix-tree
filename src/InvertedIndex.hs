@@ -1,10 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module InvertedIndex
   ( InvertedIndex,
     iiFromList,
@@ -17,7 +10,6 @@ import Data.List (zip3)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Protolude
 
 data InvertedIndex = InvertedIndex
   { iiElems :: Set Text,

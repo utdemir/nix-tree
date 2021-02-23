@@ -1,15 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module StorePath
   ( StoreName (..),
     storeNameToPath,
@@ -35,7 +23,6 @@ import qualified Data.HashSet as HS
 import Data.List (partition)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
-import Protolude
 import System.FilePath.Posix (splitDirectories)
 import System.Process.Typed (proc, readProcessStdout_)
 

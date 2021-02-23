@@ -1,8 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module Main where
 
 import App
@@ -10,7 +5,6 @@ import qualified Data.HashMap.Strict as HM
 import Data.Version (showVersion)
 import PathStats
 import Paths_nix_tree (version)
-import Protolude
 import System.Directory (canonicalizePath, doesDirectoryExist, getHomeDirectory)
 import System.FilePath ((</>))
 

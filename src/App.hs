@@ -1,8 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module App (run, helpText) where
 
 import qualified Brick as B
@@ -16,7 +11,6 @@ import qualified Data.Text as T
 import qualified Graphics.Vty as V
 import InvertedIndex
 import PathStats
-import Protolude
 import qualified System.HrfSize as HRF
 
 data Widgets

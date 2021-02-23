@@ -1,19 +1,48 @@
+cabal-version:       2.4
+
 name:                nix-tree
 synopsis:            Interactively browse a Nix store paths dependencies
 description:         A terminal curses application to browse a Nix store paths dependencies
 version:             0.1.3.1
 homepage:            https://github.com/utdemir/nix-tree
-license:             BSD3
+license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Utku Demir
 maintainer:          Utku Demir
 copyright:           Utku Demir
 category:            Language.Nix
 build-type:          Simple
-cabal-version:       >=1.10
 extra-source-files:  README.md
 
+common common-options
+  ghc-options:        -threaded
+                      -Wall -Wpartial-fields -Wincomplete-record-updates -Widentities
+                      -Wunused-packages
+  default-language:   Haskell2010
+  default-extensions: LambdaCase
+                      OverloadedStrings
+                      TupleSections
+                      TypeApplications
+                      GeneralizedNewtypeDeriving
+                      DeriveGeneric
+                      DeriveFunctor
+                      DerivingStrategies
+                      DeriveAnyClass
+                      FlexibleInstances
+                      DeriveLift
+                      StandaloneDeriving
+                      DataKinds
+                      KindSignatures
+                      NamedFieldPuns
+                      RankNTypes
+                      ScopedTypeVariables
+  mixins:             base hiding (Prelude)
+                    , protolude (Protolude as Prelude)
+  build-depends:      base
+                    , protolude
+
 executable nix-tree
+  import:             common-options
   main-is:            Main.hs
   hs-source-dirs:     src
   default-language:   Haskell2010
@@ -25,7 +54,6 @@ executable nix-tree
   ghc-options:        -Wall -fno-warn-name-shadowing -threaded -threaded
   build-depends:      base >= 4.11 && < 5
                     , aeson
-                    , async
                     , brick
                     , bytestring
                     , containers
@@ -34,8 +62,6 @@ executable nix-tree
                     , filepath
                     , hashable
                     , hrfsize
-                    , lens
-                    , parallel
                     , protolude
                     , text
                     , transformers

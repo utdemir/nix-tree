@@ -1,9 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module PathStats
   ( PathStats (..),
     calculatePathStats,
@@ -16,7 +10,6 @@ where
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Lazy as M
 import qualified Data.Set as S
-import Protolude
 import StorePath
 
 data IntermediatePathStats s = IntermediatePathStats
