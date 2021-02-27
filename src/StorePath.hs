@@ -3,6 +3,7 @@ module StorePath
     storeNameToPath,
     storeNameToText,
     storeNameToShortText,
+    storeNameToSplitShortText,
     StorePath (..),
     StoreEnv (..),
     withStoreEnv,
@@ -44,7 +45,13 @@ storeNameToPath :: StoreName a -> FilePath
 storeNameToPath (StoreName sn) = "/nix/store/" <> toS sn
 
 storeNameToShortText :: StoreName a -> Text
-storeNameToShortText = T.drop 1 . T.dropWhile (/= '-') . storeNameToText
+storeNameToShortText = snd . storeNameToSplitShortText
+
+storeNameToSplitShortText :: StoreName a -> (Text, Text)
+storeNameToSplitShortText txt =
+  case T.span (/= '-') . T.pack $ storeNameToPath txt of
+    (f, s) | Just (c, s'') <- T.uncons s -> (T.snoc f c, s'')
+    e -> e
 
 --------------------------------------------------------------------------------
 

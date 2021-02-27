@@ -36,6 +36,7 @@ common common-options
                       NamedFieldPuns
                       RankNTypes
                       ScopedTypeVariables
+                      NumericUnderscores
   other-modules:      PathStats
                       StorePath
                       App
@@ -50,6 +51,7 @@ common common-options
                     , brick
                     , bytestring
                     , containers
+                    , clock
                     , deepseq
                     , directory
                     , filepath

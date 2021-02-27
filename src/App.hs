@@ -1,6 +1,7 @@
 module App (run, helpText) where
 
 import qualified Brick as B
+import qualified Brick.BChan as B
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
@@ -11,7 +12,11 @@ import qualified Data.Text as T
 import qualified Graphics.Vty as V
 import InvertedIndex
 import PathStats
+import qualified System.Clock as Clock
 import qualified System.HrfSize as HRF
+
+data Event
+  = EventTick Clock.TimeSpec
 
 data Widgets
   = WidgetPrevPane
@@ -26,6 +31,11 @@ data Modal s
   | ModalWhyDepends (B.GenericList Widgets Seq (NonEmpty (Path s)))
   | ModalSearch Text Text (B.GenericList Widgets Seq (Path s))
 
+succCycle :: forall a. (Bounded a, Enum a) => a -> a
+succCycle a
+  | fromEnum a == fromEnum (maxBound @a) = minBound
+  | otherwise = succ a
+
 data AppEnv s = AppEnv
   { aeActualStoreEnv :: StoreEnv s (PathStats s),
     aeInvertedIndex :: InvertedIndex,
@@ -34,23 +44,42 @@ data AppEnv s = AppEnv
     aeNextPane :: List s,
     aeParents :: [List s],
     aeOpenModal :: Maybe (Modal s),
-    aeShowInfoPane :: Bool
+    aeSortOrder :: SortOrder,
+    aeSortOrderLastChanged :: Clock.TimeSpec,
+    aeCurrTime :: Clock.TimeSpec
   }
 
 type Path s = StorePath s (StoreName s) (PathStats s)
 
 type List s = B.GenericList Widgets Seq (Path s)
 
-attrTerminal :: B.AttrName
+data SortOrder
+  = SortOrderAlphabetical
+  | SortOrderClosureSize
+  | SortOrderAddedSize
+  deriving (Show, Eq, Enum, Bounded)
+
+compareBySortOrder :: SortOrder -> Path s -> Path s -> Ordering
+compareBySortOrder SortOrderAlphabetical = compare `on` T.toLower . storeNameToShortText . spName
+compareBySortOrder SortOrderClosureSize = compare `on` Down . psTotalSize . spPayload
+compareBySortOrder SortOrderAddedSize = compare `on` Down . psAddedSize . spPayload
+
+attrTerminal, attrUnderlined :: B.AttrName
 attrTerminal = "terminal"
+attrUnderlined = "underlined"
 
 run :: StoreEnv s (PathStats s) -> IO ()
-run env = void . B.defaultMain app =<< appEnv
-  where
-    appEnv = do
-      let ii = iiFromList . toList . map (storeNameToText . spName) $ seAll env
-      _ <- forkIO $ evaluate (rnf ii)
-      return $
+run env = do
+  -- Create the inverted index, and start evaluating it in the background
+  let ii = iiFromList . toList . map (storeNameToText . spName) $ seAll env
+  _ <- forkIO $ evaluate (rnf ii)
+
+  -- Initial state
+  let getTime = Clock.getTime Clock.Monotonic
+  currTime <- getTime
+  let defaultSortOrder = SortOrderClosureSize
+
+  let appEnv =
         AppEnv
           { aeActualStoreEnv =
               env,
@@ -59,23 +88,47 @@ run env = void . B.defaultMain app =<< appEnv
             aePrevPane =
               B.list WidgetPrevPane S.empty 0,
             aeCurrPane =
-              B.list WidgetCurrPane (S.fromList . NE.toList $ seGetRoots env) 0,
+              B.list
+                WidgetCurrPane
+                (S.fromList . sortBy (compareBySortOrder defaultSortOrder) . NE.toList $ seGetRoots env)
+                0,
             aeNextPane =
               B.list WidgetNextPane S.empty 0,
             aeParents =
               [],
             aeOpenModal =
               Nothing,
-            aeShowInfoPane =
-              True
+            aeSortOrder =
+              defaultSortOrder,
+            aeSortOrderLastChanged =
+              Clock.TimeSpec 0 0,
+            aeCurrTime =
+              currTime
           }
           & repopulateNextPane
 
+  -- Create a channel that's fed by current time
+  chan <- B.newBChan 10
+  void . forkIO $
+    forever $ do
+      threadDelay (100 * 100)
+      t <- getTime
+      _ <- B.writeBChanNonBlocking chan (EventTick t)
+      return ()
+
+  -- And run the application
+  let mkVty = V.mkVty V.defaultConfig
+  initialVty <- mkVty
+  _ <- B.customMain initialVty mkVty (Just chan) app appEnv
+
+  return ()
+
 renderList ::
+  Maybe SortOrder ->
   Bool ->
   List s ->
   B.Widget Widgets
-renderList isFocused =
+renderList highlightSort isFocused =
   B.renderList
     ( \_
        StorePath
@@ -88,22 +141,35 @@ renderList isFocused =
                   then B.withAttr attrTerminal
                   else identity
            in color $
-                B.padRight B.Max (B.txt $ storeNameToShortText spName)
-                  B.<+> B.padLeft
-                    B.Max
-                    ( B.txt $
-                        prettySize psTotalSize
-                          <> if not (null spRefs)
-                            then
-                              " ("
-                                <> prettySize psAddedSize
-                                <> ")"
-                            else mempty
-                    )
+                B.hBox
+                  [ B.txt (storeNameToShortText spName)
+                      & underlineWhen SortOrderAlphabetical
+                      & B.padRight (B.Pad 1)
+                      & B.padRight B.Max,
+                    if null spRefs
+                      then
+                        B.txt (prettySize psTotalSize)
+                          & underlineWhen SortOrderClosureSize
+                          & underlineWhen SortOrderAddedSize
+                      else
+                        B.hBox
+                          [ B.txt (prettySize psTotalSize)
+                              & underlineWhen SortOrderClosureSize,
+                            B.txt " (",
+                            B.txt (prettySize psAddedSize)
+                              & underlineWhen SortOrderAddedSize,
+                            B.txt ")"
+                          ]
+                  ]
     )
     isFocused
+  where
+    underlineWhen so =
+      if Just so == highlightSort
+        then B.withDefAttr attrUnderlined
+        else identity
 
-app :: B.App (AppEnv s) () Widgets
+app :: B.App (AppEnv s) Event Widgets
 app =
   B.App
     { B.appDraw = \env@AppEnv {aeOpenModal} ->
@@ -127,8 +193,13 @@ app =
             B.continue $ showWhyDepends s
           (B.VtyEvent (V.EvKey (V.KChar '/') []), Nothing) ->
             B.continue $ showAndUpdateSearch "" "" s
-          (B.VtyEvent (V.EvKey (V.KChar 'i') []), Nothing) ->
-            B.continue $ s {aeShowInfoPane = not (aeShowInfoPane s)}
+          (B.VtyEvent (V.EvKey (V.KChar 's') []), Nothing) ->
+            B.continue $
+              s
+                { aeSortOrder = succCycle (aeSortOrder s),
+                  aeSortOrderLastChanged = aeCurrTime s
+                }
+                & sortPanes
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'h', V.KLeft] ->
               B.continue $ moveLeft s
@@ -205,6 +276,9 @@ app =
           (B.VtyEvent (V.EvKey k []), Just ModalHelp)
             | k `elem` [V.KChar 'q', V.KEsc] ->
               B.continue s {aeOpenModal = Nothing}
+          -- handle our events
+          (B.AppEvent (EventTick t), Nothing) ->
+            B.continue $ s {aeCurrTime = t}
           -- ignore otherwise
           _ ->
             B.continue s,
@@ -213,7 +287,8 @@ app =
         B.attrMap
           (V.white `B.on` V.black)
           [ (B.listSelectedFocusedAttr, V.black `B.on` V.white),
-            (attrTerminal, B.fg V.blue)
+            (attrTerminal, B.fg V.blue),
+            (attrUnderlined, V.currentAttr `V.withStyle` V.underline)
           ]
     }
   where
@@ -229,45 +304,50 @@ app =
         )
 
 renderMainScreen :: AppEnv s -> B.Widget Widgets
-renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeShowInfoPane} =
+renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
   (B.joinBorders . B.border)
     ( B.hBox
-        [ renderList True aePrevPane,
+        [ renderList Nothing True aePrevPane,
           B.vBorder,
-          renderList True aeCurrPane,
+          renderList shouldHighlightSortOrder True aeCurrPane,
           B.vBorder,
-          renderList False aeNextPane
+          renderList Nothing False aeNextPane
         ]
     )
-    B.<=> if aeShowInfoPane then renderInfoPane env else renderModeline env
-
-renderModeline :: AppEnv s -> B.Widget Widgets
-renderModeline env =
-  let selected = selectedPath env
-   in B.txt $
-        T.intercalate
-          " - "
-          [ T.pack $ storeNameToPath (spName selected),
-            "NAR Size: " <> prettySize (spSize selected),
-            "Closure Size: " <> prettySize (psTotalSize $ spPayload selected)
-          ]
+    B.<=> renderInfoPane env
+  where
+    shouldHighlightSortOrder =
+      let timePassed = Clock.diffTimeSpec (aeCurrTime env) (aeSortOrderLastChanged env)
+       in if timePassed < Clock.TimeSpec 0 (500 * 1_000_000)
+            then Just (aeSortOrder env)
+            else Nothing
 
 renderInfoPane :: AppEnv s -> B.Widget Widgets
 renderInfoPane env =
   let selected = selectedPath env
       immediateParents = psImmediateParents $ spPayload selected
-   in B.txt $
-        T.intercalate
-          "\n"
-          [ T.pack $ storeNameToPath (spName selected),
-            "NAR Size: " <> prettySize (spSize selected),
-            "Closure Size: " <> prettySize (psTotalSize $ spPayload selected),
+   in B.vBox
+        [ ( let (f, s) = storeNameToSplitShortText (spName selected)
+             in B.txt f B.<+> underlineWhen SortOrderAlphabetical (B.txt s)
+          ),
+          [ B.txt $ "NAR Size: " <> prettySize (spSize selected),
+            underlineWhen SortOrderClosureSize . B.txt $ "Closure Size: " <> prettySize (psTotalSize $ spPayload selected),
+            underlineWhen SortOrderAddedSize . B.txt $ "Added Size: " <> prettySize (psAddedSize $ spPayload selected)
+          ]
+            & intersperse (B.txt " | ")
+            & B.hBox,
+          B.txt $
             if null immediateParents
               then "Immediate Parents: -"
               else
                 "Immediate Parents (" <> T.pack (show $ length immediateParents) <> "): "
                   <> T.intercalate ", " (map storeNameToShortText immediateParents)
-          ]
+        ]
+  where
+    underlineWhen so =
+      if so == aeSortOrder env
+        then B.withAttr attrUnderlined
+        else identity
 
 renderModal :: Text -> B.Widget a -> B.Widget a
 renderModal title widget =
@@ -285,7 +365,7 @@ helpText =
       "q/Esc:          : Quit / close modal",
       "w               : Open why-depends mode",
       "/               : Open search mode",
-      "i               : Toggle modeline",
+      "s               : Change sort order",
       "?               : Show help"
     ]
 
@@ -326,7 +406,7 @@ renderSearchModal left right l =
     window =
       B.txt left B.<+> B.txt "|" B.<+> B.txt right
         B.<=> B.hBorder
-        B.<=> renderList True l
+        B.<=> renderList Nothing True l
 
 showAndUpdateSearch :: Text -> Text -> AppEnv s -> AppEnv s
 showAndUpdateSearch left right env@AppEnv {aeActualStoreEnv, aeInvertedIndex} =
@@ -368,12 +448,12 @@ moveRight env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeParents}
       & repopulateNextPane
 
 repopulateNextPane :: AppEnv s -> AppEnv s
-repopulateNextPane env@AppEnv {aeActualStoreEnv, aeNextPane} =
+repopulateNextPane env@AppEnv {aeActualStoreEnv, aeNextPane, aeSortOrder} =
   let ref = selectedPath env
    in env
         { aeNextPane =
             B.listReplace
-              ( S.sortOn (Down . psTotalSize . spPayload)
+              ( S.sortBy (compareBySortOrder aeSortOrder)
                   . S.fromList
                   . map (seLookup aeActualStoreEnv)
                   $ spRefs ref
@@ -381,6 +461,24 @@ repopulateNextPane env@AppEnv {aeActualStoreEnv, aeNextPane} =
               (Just 0)
               aeNextPane
         }
+
+sortPane :: SortOrder -> List s -> List s
+sortPane so l =
+  let selected = B.listSelectedElement l
+      elems =
+        B.listElements l
+          & S.sortBy (compareBySortOrder so)
+      name = B.getName l
+   in mkList so name elems (snd <$> selected)
+
+sortPanes :: AppEnv s -> AppEnv s
+sortPanes env@AppEnv {aeParents, aePrevPane, aeCurrPane, aeNextPane, aeSortOrder} =
+  env
+    { aeCurrPane = sortPane aeSortOrder aeCurrPane,
+      aeNextPane = sortPane aeSortOrder aeNextPane,
+      aeParents = sortPane aeSortOrder <$> aeParents,
+      aePrevPane = sortPane aeSortOrder aePrevPane
+    }
 
 selectedPath :: AppEnv s -> Path s
 selectedPath = NE.head . selectedPaths
@@ -412,8 +510,7 @@ selectPath path env@AppEnv {aeActualStoreEnv} =
           (NE.toList (seGetRoots aeActualStoreEnv), root)
           children
           & NE.reverse
-          & fmap
-            (\(possible, selected) -> mkList WidgetPrevPane possible selected)
+          & fmap (\(possible, selected) -> mkList (aeSortOrder env) WidgetPrevPane (S.fromList possible) (Just selected))
           & (<> (emptyPane :| []))
    in case lists of
         (curr :| prevs) ->
@@ -427,13 +524,20 @@ selectPath path env@AppEnv {aeActualStoreEnv} =
                 }
                 & repopulateNextPane
   where
-    mkList name possible selected =
-      let contents = S.sortOn (Down . psTotalSize . spPayload) (S.fromList possible)
-       in B.list name contents 1
-            & B.listMoveTo
-              (fromMaybe (0) $ (((==) `on` spName) selected) `S.findIndexL` contents)
     emptyPane =
       B.list WidgetPrevPane S.empty 0
+
+mkList ::
+  SortOrder ->
+  n ->
+  Seq (Path s) ->
+  Maybe (Path s) ->
+  B.GenericList n Seq (Path s)
+mkList sortOrder name possible selected =
+  let contents = S.sortBy (compareBySortOrder sortOrder) possible
+   in B.list name contents 1
+        & B.listMoveTo
+          (fromMaybe 0 $ selected >>= \s -> (((==) `on` spName) s) `S.findIndexL` contents)
 
 -- Utils
 
