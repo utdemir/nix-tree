@@ -12,7 +12,7 @@ maintainer:          Utku Demir
 copyright:           Utku Demir
 category:            Language.Nix
 build-type:          Simple
-extra-source-files:  README.md
+extra-source-files:  README.md, CHANGELOG.md
 
 common common-options
   ghc-options:        -threaded
