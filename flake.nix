@@ -14,10 +14,11 @@
             nix-tree =
               hself.callCabal2nix
                 "nix-tree"
-                (self.nix-gitignore.gitignoreSourcePure
-                  [ ./.gitignore "asciicast.sh" "flake.nix" ]
-                  ./.
-                )
+                (self.lib.cleanSourceWith {
+                  filter = path: _type:
+                    !(builtins.elem (builtins.baseNameOf path) [ "asciicast.sh" "flake.nix" ]);
+                  src = ./.;
+                })
                 { };
           };
         };
