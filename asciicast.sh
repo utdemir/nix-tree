@@ -1,11 +1,13 @@
+#!/usr/bin/env bash
+
 set -o xtrace
 set -o errexit
 
 tmpdir="$(mktemp -d)"
 trap "rm -rf '$tmpdir'" EXIT
 
-nixTreePath=$(nix-build -A nix-tree --no-out-link)
-storePath=$(nix-build -E '(import (import ./nix/sources.nix).nixpkgs {}).git')
+nixTreePath=$(nix build --json | jq '.[].outputs.out' -r)
+storePath=$(nix-build -E '(import <nixpkgs> {}).git')
 
 TMUX="tmux -S "$tmpdir/tmux.sock""
 echo "$TMUX attach -r"
@@ -23,17 +25,18 @@ sleep 1
 $TMUX send-keys Enter
 sleep 2
 
-# navigate to openssl
-for i in Right Down Down Down Right Down Down; do
+# navigate to curl
+for i in Right Down Down Down Down Down Right Down; do
   $TMUX send-keys $i
-  sleep 1
+  sleep 0.5
 done
-
 
 $TMUX send-keys w
 sleep 2
 
-$TMUX send-keys Down
+$TMUX send-keys Up
+sleep 0.5
+$TMUX send-keys Up
 sleep 1
 
 $TMUX send-keys Enter

@@ -5,7 +5,7 @@
 
 Interactively browse the dependency graph of your Nix derivations.
 
-[![asciicast](https://asciinema.org/a/ahDveBL1gs5t36z1myePtrKpR.svg)](https://asciinema.org/a/ahDveBL1gs5t36z1myePtrKpR)
+[![asciicast](https://asciinema.org/a/cnilbmPXW51g97hdNJZcM5F6h.svg)](https://asciinema.org/a/cnilbmPXW51g97hdNJZcM5F6h.svg)
 
 ## Installation
 
