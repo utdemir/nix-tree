@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.5
+
 * feat: Add sort order toggle.
 * fix: Search now does not contain false-positives.
 
