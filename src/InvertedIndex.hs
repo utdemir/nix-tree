@@ -11,20 +11,20 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 
-data InvertedIndex = InvertedIndex
-  { iiElems :: Set Text,
+data InvertedIndex a = InvertedIndex
+  { iiElems :: Map Text a,
     iiUnigrams :: Map Char (Set Text),
     iiBigrams :: Map (Char, Char) (Set Text),
     iiTrigrams :: Map (Char, Char, Char) (Set Text)
   }
   deriving (Generic, Show)
 
-instance NFData InvertedIndex
+instance NFData a => NFData (InvertedIndex a)
 
-iiInsert :: Text -> InvertedIndex -> InvertedIndex
-iiInsert txt InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams} =
+iiInsert :: Text -> a -> InvertedIndex a -> InvertedIndex a
+iiInsert txt val InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams} =
   InvertedIndex
-    { iiElems = Set.insert txt iiElems,
+    { iiElems = Map.insert txt val iiElems,
       iiUnigrams = combine iiUnigrams (unigramsOf txt),
       iiBigrams = combine iiBigrams (bigramsOf txt),
       iiTrigrams = combine iiTrigrams (trigramsOf txt)
@@ -36,11 +36,11 @@ iiInsert txt InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams} =
         orig
         (setToMap (Set.singleton txt) chrs)
 
-iiFromList :: Foldable f => f Text -> InvertedIndex
+iiFromList :: Foldable f => f (Text, a) -> InvertedIndex a
 iiFromList =
   foldl
-    (flip iiInsert)
-    (InvertedIndex Set.empty Map.empty Map.empty Map.empty)
+    (flip (uncurry iiInsert))
+    (InvertedIndex Map.empty Map.empty Map.empty Map.empty)
 
 setToMap :: v -> Set k -> Map k v
 setToMap v = Map.fromDistinctAscList . map (,v) . Set.toAscList
@@ -58,7 +58,7 @@ trigramsOf txt = case Text.unpack (Text.toLower txt) of
   p1@(_ : p2@(_ : p3)) -> Set.fromList $ zip3 p1 p2 p3
   _ -> Set.empty
 
-iiSearch :: Text -> InvertedIndex -> Set Text
+iiSearch :: forall a. Text -> InvertedIndex a -> Map Text a
 iiSearch txt InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams}
   | Text.length txt == 0 = iiElems
   | Text.length txt == 1 = using unigramsOf iiUnigrams
@@ -66,7 +66,7 @@ iiSearch txt InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams}
   | otherwise = using trigramsOf iiTrigrams
   where
     lowerTxt = Text.toLower txt
-    using :: Ord a => (Text -> Set a) -> Map a (Set Text) -> Set Text
+    using :: Ord c => (Text -> Set c) -> Map c (Set Text) -> Map Text a
     using getGrams m =
       Map.intersection m (setToMap () (getGrams txt))
         & Map.elems
@@ -74,3 +74,4 @@ iiSearch txt InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams}
           [] -> Set.empty
           x : xs -> foldl' Set.intersection x xs
         & Set.filter (\t -> lowerTxt `Text.isInfixOf` Text.toLower t)
+        & Map.restrictKeys iiElems

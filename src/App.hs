@@ -6,6 +6,7 @@ import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Map as Map
 import qualified Data.Sequence as S
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -38,7 +39,7 @@ succCycle a
 
 data AppEnv s = AppEnv
   { aeActualStoreEnv :: StoreEnv s (PathStats s),
-    aeInvertedIndex :: InvertedIndex,
+    aeInvertedIndex :: InvertedIndex (Path s),
     aePrevPane :: List s,
     aeCurrPane :: List s,
     aeNextPane :: List s,
@@ -71,7 +72,7 @@ attrUnderlined = "underlined"
 run :: StoreEnv s (PathStats s) -> IO ()
 run env = do
   -- Create the inverted index, and start evaluating it in the background
-  let ii = iiFromList . toList . map (storeNameToText . spName) $ seAll env
+  let ii = iiFromList . toList . map (\sp -> (storeNameToText (spName sp), sp)) $ seAll env
   _ <- forkIO $ evaluate (rnf ii)
 
   -- Initial state
@@ -409,14 +410,14 @@ renderSearchModal left right l =
         B.<=> renderList Nothing True l
 
 showAndUpdateSearch :: Text -> Text -> AppEnv s -> AppEnv s
-showAndUpdateSearch left right env@AppEnv {aeActualStoreEnv, aeInvertedIndex} =
+showAndUpdateSearch left right env@AppEnv {aeInvertedIndex} =
   env {aeOpenModal = Just $ ModalSearch left right results}
   where
     results =
       let xs =
             iiSearch (left <> right) aeInvertedIndex
-              & (S.fromList . Set.toList)
-              & fmap (seLookup aeActualStoreEnv . StoreName)
+              & Map.elems
+              & S.fromList
        in B.list WidgetSearch xs 1
 
 move :: (List s -> List s) -> AppEnv s -> AppEnv s

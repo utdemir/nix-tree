@@ -12,6 +12,8 @@ module StorePath
     seGetRoots,
     seBottomUp,
     seFetchRefs,
+    getNixStore,
+    mkStoreName,
   )
 where
 
@@ -24,25 +26,42 @@ import qualified Data.HashSet as HS
 import Data.List (partition)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
-import System.FilePath.Posix (splitDirectories)
+import System.FilePath.Posix (addTrailingPathSeparator, splitDirectories, (</>))
 import System.Process.Typed (proc, readProcessStdout_)
+
+newtype NixStore = NixStore FilePath
+  deriving newtype (Show, Eq, Ord, NFData, Hashable)
+
+getNixStore :: IO NixStore
+getNixStore = do
+  let prog = "nix-instantiate"
+      args = ["--eval", "--expr", "(builtins.storeDir)", "--json"]
+  out <-
+    readProcessStdout_ (proc prog args)
+      <&> fmap addTrailingPathSeparator . decode @FilePath
+      <&> fmap NixStore
+  case out of
+    Nothing -> fail $ "Error interpreting output of: " ++ show (prog, args)
+    Just p -> return p
 
 --------------------------------------------------------------------------------
 
-newtype StoreName s = StoreName Text
-  deriving newtype (Show, Eq, Ord, Hashable, NFData)
+data StoreName s = StoreName NixStore Text
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (NFData, Hashable)
 
-mkStoreName :: FilePath -> Maybe (StoreName a)
-mkStoreName path =
-  case splitDirectories path of
-    "/" : "nix" : "store" : name : _ -> Just . StoreName $ toS name
-    _ -> Nothing
+mkStoreName :: NixStore -> FilePath -> Maybe (StoreName a)
+mkStoreName ns@(NixStore ps) path = do
+  guard $ ps `isPrefixOf` path
+  let ds = splitDirectories (drop (length ps) path)
+  sn <- listToMaybe ds
+  return $ StoreName ns (toS sn)
 
 storeNameToText :: StoreName a -> Text
-storeNameToText (StoreName n) = n
+storeNameToText (StoreName _ n) = n
 
 storeNameToPath :: StoreName a -> FilePath
-storeNameToPath (StoreName sn) = "/nix/store/" <> toS sn
+storeNameToPath (StoreName (NixStore ns) sn) = ns </> toS sn
 
 storeNameToShortText :: StoreName a -> Text
 storeNameToShortText = snd . storeNameToSplitShortText
@@ -67,6 +86,7 @@ instance (NFData a, NFData b) => NFData (StorePath s a b)
 
 mkStorePaths :: NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
 mkStorePaths names = do
+  nixStore <- getNixStore
   -- See: https://github.com/utdemir/nix-tree/issues/12
   --
   -- > In Nix < 2.4, when you pass a .drv to path-info, it returns information about the store
@@ -79,16 +99,16 @@ mkStorePaths names = do
           (\i -> ".drv" `T.isSuffixOf` storeNameToText i)
           (NE.toList names)
   (++)
-    <$> maybe (return []) (getPathInfo False) (NE.nonEmpty outputs)
-    <*> maybe (return []) (getPathInfo (True && isAtLeastNix24)) (NE.nonEmpty derivations)
+    <$> maybe (return []) (getPathInfo nixStore False) (NE.nonEmpty outputs)
+    <*> maybe (return []) (getPathInfo nixStore (True && isAtLeastNix24)) (NE.nonEmpty derivations)
   where
     getNixVersion :: IO (Maybe Text)
     getNixVersion = do
       out <- decodeUtf8 . BL.toStrict <$> readProcessStdout_ (proc "nix" ["--version"])
       return . lastMay $ T.splitOn " " out
 
-getPathInfo :: Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
-getPathInfo isDrv names = do
+getPathInfo :: NixStore -> Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
+getPathInfo nixStore isDrv names = do
   infos <-
     decode @[NixPathInfoResult]
       <$> readProcessStdout_
@@ -117,11 +137,11 @@ getPathInfo isDrv names = do
       maybe
         (fail $ "Failed parsing Nix store path: " ++ show p)
         return
-        (mkStoreName p)
+        (mkStoreName nixStore p)
 
     assertValidInfo (NixPathInfoValid pathinfo) = return pathinfo
     assertValidInfo (NixPathInfoInvalid path) =
-      fail $ "Invalid path: " ++ path ++ ". Inconsistent /nix/store or ongoing GC."
+      fail $ "Invalid path: " ++ path ++ ". Inconsistent NIX_STORE or ongoing GC."
 
 --------------------------------------------------------------------------------
 
@@ -138,10 +158,12 @@ withStoreEnv ::
   (forall s. StoreEnv s () -> m a) ->
   m (Either [FilePath] a)
 withStoreEnv fnames cb = do
+  nixStore <- liftIO getNixStore
+
   let names' =
         fnames
           & toList
-          & map (\f -> maybe (Left f) Right (mkStoreName f))
+          & map (\f -> maybe (Left f) Right (mkStoreName nixStore f))
           & partitionEithers
 
   case names' of
