@@ -25,6 +25,7 @@ data Widgets
   | WidgetNextPane
   | WidgetWhyDepends
   | WidgetSearch
+  | WidgetWhyDependsViewport
   deriving (Show, Eq, Ord)
 
 data Modal s
@@ -190,7 +191,8 @@ app =
               B.halt s
           (B.VtyEvent (V.EvKey (V.KChar '?') []), Nothing) ->
             B.continue s {aeOpenModal = Just ModalHelp}
-          (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) ->
+          (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) -> do
+            B.hScrollToBeginning (B.viewportScroll WidgetWhyDependsViewport)
             B.continue $ showWhyDepends s
           (B.VtyEvent (V.EvKey (V.KChar '/') []), Nothing) ->
             B.continue $ showAndUpdateSearch "" "" s
@@ -221,12 +223,20 @@ app =
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
             | k `elem` [V.KChar 'q', V.KEsc] ->
               B.continue s {aeOpenModal = Nothing}
+          (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
+            | k `elem` [V.KChar 'h', V.KLeft] -> do
+              B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) (-1)
+              B.continue s
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
             | k `elem` [V.KChar 'j', V.KDown, V.KChar '\t'] ->
               B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveDown l)}
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
             | k `elem` [V.KChar 'k', V.KUp, V.KBackTab] ->
               B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveUp l)}
+          (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
+            | k `elem` [V.KChar 'l', V.KRight] -> do
+              B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) 1
+              B.continue s
           (B.VtyEvent (V.EvKey V.KPageUp []), Just (ModalWhyDepends l)) ->
             B.listMovePageUp l >>= \l' ->
               B.continue s {aeOpenModal = Just $ ModalWhyDepends l'}
@@ -377,7 +387,11 @@ renderWhyDependsModal ::
   B.GenericList Widgets Seq (NonEmpty (Path s)) ->
   B.Widget Widgets
 renderWhyDependsModal l =
-  renderModal "why-depends" (B.renderList renderDepends True l)
+    B.renderList renderDepends True l
+      & B.hLimitPercent 100 -- This limit seems pointless, but otherwise render list takes infinite
+                            -- amount of horizontal space and 'viewport' below complains.
+      & B.viewport WidgetWhyDependsViewport B.Horizontal
+      & renderModal "why-depends"
   where
     renderDepends _ =
       B.txt . pathsToText
