@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* feat: Support non standard Nix store locations
+
 ## 0.1.5
 
 * feat: Add sort order toggle.
