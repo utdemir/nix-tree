@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.6
+
 * feat: Support non standard Nix store locations
 * feat: Horizontal scrolling on why-depends window
 
