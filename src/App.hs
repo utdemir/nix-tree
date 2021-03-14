@@ -387,11 +387,11 @@ renderWhyDependsModal ::
   B.GenericList Widgets Seq (NonEmpty (Path s)) ->
   B.Widget Widgets
 renderWhyDependsModal l =
-    B.renderList renderDepends True l
-      & B.hLimitPercent 100 -- This limit seems pointless, but otherwise render list takes infinite
-                            -- amount of horizontal space and 'viewport' below complains.
-      & B.viewport WidgetWhyDependsViewport B.Horizontal
-      & renderModal "why-depends"
+  B.renderList renderDepends True l
+    & B.hLimitPercent 100 -- This limit seems pointless, but otherwise render list takes infinite
+    -- amount of horizontal space and 'viewport' below complains.
+    & B.viewport WidgetWhyDependsViewport B.Horizontal
+    & renderModal "why-depends"
   where
     renderDepends _ =
       B.txt . pathsToText
