@@ -1,13 +1,11 @@
 # Changelog
 
-## Unreleased
-
-## 0.1.6
+## 0.1.6 - 2021-03-12
 
 * feat: Support non standard Nix store locations
 * feat: Horizontal scrolling on why-depends window
 
-## 0.1.5
+## 0.1.5 - 2021-03-03
 
 * feat: Add sort order toggle.
 * fix: Search now does not contain false-positives.
