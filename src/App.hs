@@ -5,6 +5,7 @@ import qualified Brick.BChan as B
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
+import qualified Clipboard
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Sequence as S
@@ -28,8 +29,10 @@ data Widgets
   | WidgetWhyDependsViewport
   deriving (Show, Eq, Ord)
 
+data Notice = Notice Text Text
+
 data Modal s
-  = ModalHelp
+  = ModalNotice Notice
   | ModalWhyDepends (B.GenericList Widgets Seq (NonEmpty (Path s)))
   | ModalSearch Text Text (B.GenericList Widgets Seq (Path s))
 
@@ -177,9 +180,9 @@ app =
     { B.appDraw = \env@AppEnv {aeOpenModal} ->
         [ case aeOpenModal of
             Nothing -> B.emptyWidget
-            Just ModalHelp -> renderHelpModal
             Just (ModalWhyDepends l) -> renderWhyDependsModal l
-            Just (ModalSearch l r xs) -> renderSearchModal l r xs,
+            Just (ModalSearch l r xs) -> renderSearchModal l r xs
+            Just (ModalNotice notice) -> renderNotice notice,
           renderMainScreen env
         ],
       B.appChooseCursor = \_ -> const Nothing,
@@ -190,12 +193,17 @@ app =
             | k `elem` [V.KChar 'q', V.KEsc] ->
               B.halt s
           (B.VtyEvent (V.EvKey (V.KChar '?') []), Nothing) ->
-            B.continue s {aeOpenModal = Just ModalHelp}
+            B.continue s {aeOpenModal = Just (ModalNotice helpNotice)}
           (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) -> do
             B.hScrollToBeginning (B.viewportScroll WidgetWhyDependsViewport)
             B.continue $ showWhyDepends s
           (B.VtyEvent (V.EvKey (V.KChar '/') []), Nothing) ->
             B.continue $ showAndUpdateSearch "" "" s
+          (B.VtyEvent (V.EvKey (V.KChar 'y') []), Nothing) -> do
+            liftIO (yankToClipboard $ spName (selectedPath s))
+              >>= \case
+                Right () -> B.continue s
+                Left n -> B.continue s {aeOpenModal = Just (ModalNotice n)}
           (B.VtyEvent (V.EvKey (V.KChar 's') []), Nothing) ->
             B.continue $
               s
@@ -283,8 +291,8 @@ app =
                       selectPath
                         (shortestPathTo (aeActualStoreEnv s) (spName path))
                         closed
-          -- help modal
-          (B.VtyEvent (V.EvKey k []), Just ModalHelp)
+          -- notices
+          (B.VtyEvent (V.EvKey k []), Just (ModalNotice _))
             | k `elem` [V.KChar 'q', V.KEsc] ->
               B.continue s {aeOpenModal = Nothing}
           -- handle our events
@@ -313,6 +321,20 @@ app =
               "+-.=?_"
             ]
         )
+
+yankToClipboard :: StoreName s -> IO (Either Notice ())
+yankToClipboard p =
+  Clipboard.copy (toS $ storeNameToPath p)
+    <&> \case
+      Right () -> Right ()
+      Left errs ->
+        Left $
+          Notice
+            "Error"
+            ( T.intercalate "\n" $
+                "Cannot copy to clipboard: " :
+                map ("  " <>) errs
+            )
 
 renderMainScreen :: AppEnv s -> B.Widget Widgets
 renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
@@ -373,15 +395,19 @@ helpText =
   T.intercalate
     "\n"
     [ "hjkl/Arrow Keys : Navigate",
-      "q/Esc:          : Quit / close modal",
       "w               : Open why-depends mode",
       "/               : Open search mode",
       "s               : Change sort order",
-      "?               : Show help"
+      "y               : Yank selected path to clipboard",
+      "?               : Show help",
+      "q/Esc:          : Quit / close modal"
     ]
 
-renderHelpModal :: B.Widget a
-renderHelpModal = renderModal "Help" (B.txt helpText)
+helpNotice :: Notice
+helpNotice = Notice "Help" helpText
+
+renderNotice :: Notice -> B.Widget a
+renderNotice (Notice title txt) = renderModal title (B.txt txt)
 
 renderWhyDependsModal ::
   B.GenericList Widgets Seq (NonEmpty (Path s)) ->

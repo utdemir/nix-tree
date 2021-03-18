@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* feat: Ability to yank selected store path to clipboard (shortcut: 'y')
+
 ## 0.1.6 - 2021-03-12
 
 * feat: Support non standard Nix store locations

@@ -41,6 +41,7 @@ common common-options
                       StorePath
                       App
                       InvertedIndex
+                      Clipboard
                       Paths_nix_tree
   autogen-modules:    Paths_nix_tree
   mixins:             base hiding (Prelude)
