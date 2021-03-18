@@ -6,6 +6,7 @@ import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
 import qualified Clipboard
+import Control.Concurrent
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Sequence as S
@@ -76,8 +77,8 @@ attrUnderlined = "underlined"
 run :: StoreEnv s (PathStats s) -> IO ()
 run env = do
   -- Create the inverted index, and start evaluating it in the background
-  let ii = iiFromList . toList . map (\sp -> (storeNameToText (spName sp), sp)) $ seAll env
-  _ <- forkIO $ evaluate (rnf ii)
+  let ii = iiFromList . toList . fmap (\sp -> (storeNameToText (spName sp), sp)) $ seAll env
+  _ <- forkIO $ evaluateNF_ ii
 
   -- Initial state
   let getTime = Clock.getTime Clock.Monotonic
@@ -324,7 +325,7 @@ app =
 
 yankToClipboard :: StoreName s -> IO (Either Notice ())
 yankToClipboard p =
-  Clipboard.copy (toS $ storeNameToPath p)
+  Clipboard.copy (toText $ storeNameToPath p)
     <&> \case
       Right () -> Right ()
       Left errs ->
@@ -531,7 +532,7 @@ selectedPaths AppEnv {aePrevPane, aeCurrPane, aeParents} =
           (fmap snd . B.listSelectedElement)
           (aePrevPane : aeParents)
    in case B.listSelectedElement aeCurrPane of
-        Nothing -> panic "invariant violation: no selected element"
+        Nothing -> error "invariant violation: no selected element"
         Just (_, p) -> p :| parents
 
 selectPath :: NonEmpty (Path s) -> AppEnv s -> AppEnv s

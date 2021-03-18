@@ -17,10 +17,8 @@ module StorePath
   )
 where
 
-import Control.Monad (fail)
 import Data.Aeson (FromJSON (..), Value (..), decode, (.:))
 import qualified Data.ByteString.Lazy as BL
-import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.List (partition)
@@ -55,13 +53,13 @@ mkStoreName ns@(NixStore ps) path = do
   guard $ ps `isPrefixOf` path
   let ds = splitDirectories (drop (length ps) path)
   sn <- listToMaybe ds
-  return $ StoreName ns (toS sn)
+  return $ StoreName ns (toText sn)
 
 storeNameToText :: StoreName a -> Text
 storeNameToText (StoreName _ n) = n
 
 storeNameToPath :: StoreName a -> FilePath
-storeNameToPath (StoreName (NixStore ns) sn) = ns </> toS sn
+storeNameToPath (StoreName (NixStore ns) sn) = ns </> toString sn
 
 storeNameToShortText :: StoreName a -> Text
 storeNameToShortText = snd . storeNameToSplitShortText
@@ -105,7 +103,7 @@ mkStorePaths names = do
     getNixVersion :: IO (Maybe Text)
     getNixVersion = do
       out <- decodeUtf8 . BL.toStrict <$> readProcessStdout_ (proc "nix" ["--version"])
-      return . lastMay $ T.splitOn " " out
+      return . viaNonEmpty last $ T.splitOn " " out
 
 getPathInfo :: NixStore -> Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
 getPathInfo nixStore isDrv names = do
@@ -169,7 +167,7 @@ withStoreEnv fnames cb = do
   case names' of
     (errs@(_ : _), _) -> return (Left errs)
     ([], xs) -> case nonEmpty xs of
-      Nothing -> panic "invariant violation"
+      Nothing -> error "invariant violation"
       Just names -> do
         paths <- liftIO $ mkStorePaths names
         let env =
@@ -184,17 +182,17 @@ withStoreEnv fnames cb = do
 seLookup :: StoreEnv s a -> StoreName s -> StorePath s (StoreName s) a
 seLookup StoreEnv {sePaths} name =
   fromMaybe
-    (panic $ "invariant violation, StoreName not found: " <> show name)
+    (error $ "invariant violation, StoreName not found: " <> show name)
     (HM.lookup name sePaths)
 
 seAll :: StoreEnv s a -> NonEmpty (StorePath s (StoreName s) a)
 seAll StoreEnv {sePaths} = case HM.elems sePaths of
-  [] -> panic "invariant violation: no paths"
+  [] -> error "invariant violation: no paths"
   (x : xs) -> x :| xs
 
 seGetRoots :: StoreEnv s a -> NonEmpty (StorePath s (StoreName s) a)
 seGetRoots env@StoreEnv {seRoots} =
-  map (seLookup env) seRoots
+  fmap (seLookup env) seRoots
 
 seFetchRefs ::
   StoreEnv s a ->
@@ -230,7 +228,7 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
   where
     unsafeLookup k m =
       fromMaybe
-        (panic $ "invariant violation: name doesn't exists: " <> show k)
+        (error $ "invariant violation: name doesn't exists: " <> show k)
         (HM.lookup k m)
     go ::
       StoreName s ->

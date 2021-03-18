@@ -6,7 +6,6 @@ module InvertedIndex
   )
 where
 
-import Data.List (zip3)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -38,7 +37,7 @@ iiInsert txt val InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams} =
 
 iiFromList :: Foldable f => f (Text, a) -> InvertedIndex a
 iiFromList =
-  foldl
+  foldl'
     (flip (uncurry iiInsert))
     (InvertedIndex Map.empty Map.empty Map.empty Map.empty)
 

@@ -3,10 +3,11 @@ module Clipboard
   )
 where
 
-import qualified Data.ByteString.Lazy as BL
+import Control.Exception (try)
+import System.Exit
 import qualified System.Process.Typed as P
 
-cmds :: [(Text, [Text])]
+cmds :: [(FilePath, [String])]
 cmds =
   [ ("xsel", ["-i", "-b"]),
     ("xclip", ["-selection", "clipboard"]),
@@ -14,10 +15,10 @@ cmds =
     ("pbcopy", [])
   ]
 
-runCmd :: Text -> (Text, [Text]) -> IO (Either Text ())
+runCmd :: Text -> (FilePath, [String]) -> IO (Either Text ())
 runCmd txt (cmd, args) =
-  P.proc (toS cmd) (map toS args)
-    & P.setStdin (P.byteStringInput $ toUtf8Lazy txt)
+  P.proc (toString cmd) (map toString args)
+    & P.setStdin (P.byteStringInput $ encodeUtf8 txt)
     & P.readProcess
     & try
     <&> \case
@@ -29,10 +30,10 @@ runCmd txt (cmd, args) =
             <> show e
             <> ", "
             <> "stdout: "
-            <> decodeUtf8 (BL.toStrict out)
+            <> decodeUtf8 (toStrict out)
             <> ", "
             <> "stderr: "
-            <> decodeUtf8 (BL.toStrict err)
+            <> decodeUtf8 (toStrict err)
             <> "."
       (Left (ex :: SomeException)) ->
         Left $

@@ -1,12 +1,16 @@
 module Main where
 
 import App
+import Control.Concurrent (forkIO)
 import qualified Data.HashMap.Strict as HM
 import Data.Version (showVersion)
 import PathStats
 import Paths_nix_tree (version)
 import System.Directory (canonicalizePath, doesDirectoryExist, getHomeDirectory)
+import System.Environment (getArgs)
+import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
+import System.IO (hPutStr, hPutStrLn)
 
 usage :: Text
 usage =
@@ -19,15 +23,15 @@ usage =
 
 usageAndFail :: Text -> IO a
 usageAndFail msg = do
-  hPutStrLn stderr $ "Error: " <> msg
-  hPutStr stderr usage
+  hPutStrLn stderr . toString $ "Error: " <> msg
+  hPutStr stderr $ toString usage
   exitWith (ExitFailure 1)
 
 main :: IO ()
 main = do
   args <- getArgs
   when (any (`elem` ["-h", "--help"]) args) $ do
-    putStr usage
+    putText usage
     exitWith ExitSuccess
 
   when ("--version" `elem` args) $ do
@@ -65,7 +69,7 @@ main = do
                   )
                   (remaining, [])
                   nodes
-          evaluate $ rnf foundNodes
+          evaluateNF_ foundNodes
           go
             newRemaining
             (concatMap (maybe [] spRefs) foundNodes)

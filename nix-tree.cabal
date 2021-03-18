@@ -17,7 +17,6 @@ extra-source-files:  README.md, CHANGELOG.md
 common common-options
   ghc-options:        -threaded
                       -Wall -Wpartial-fields -Wincomplete-record-updates -Widentities
-                      -Wunused-packages
   default-language:   Haskell2010
   default-extensions: LambdaCase
                       OverloadedStrings
@@ -45,28 +44,28 @@ common common-options
                       Paths_nix_tree
   autogen-modules:    Paths_nix_tree
   mixins:             base hiding (Prelude)
-                    , protolude (Protolude as Prelude)
+                    , relude (Relude as Prelude)
   build-depends:      base
-                    , protolude
+                    , relude
                     , aeson
                     , brick
                     , bytestring
                     , containers
                     , clock
                     , deepseq
-                    , directory
                     , filepath
                     , hashable
                     , hrfsize
-                    , protolude
                     , text
                     , transformers
                     , typed-process
                     , unordered-containers
                     , vty
+                    , directory
 
 executable nix-tree
   import:             common-options
+  ghc-options:        -Wunused-packages
   main-is:            Main.hs
   hs-source-dirs:     src
   default-language:   Haskell2010

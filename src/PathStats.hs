@@ -7,6 +7,7 @@ module PathStats
   )
 where
 
+import Data.List (minimumBy)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Lazy as M
 import qualified Data.Set as S
