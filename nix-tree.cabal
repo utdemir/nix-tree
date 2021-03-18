@@ -76,6 +76,5 @@ test-suite nix-tree-tests
   type:             exitcode-stdio-1.0
   hs-source-dirs:   test/ src/
   main-is:          Test.hs
-  ghc-options:      -Wno-unused-packages
   build-depends:    base >=4.11 && < 5
                   , hedgehog
