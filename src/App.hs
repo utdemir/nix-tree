@@ -305,8 +305,8 @@ app =
       B.appStartEvent = \s -> return s,
       B.appAttrMap = \_ ->
         B.attrMap
-          (V.white `B.on` V.black)
-          [ (B.listSelectedFocusedAttr, V.black `B.on` V.white),
+          (V.defAttr)
+          [ (B.listSelectedFocusedAttr, V.currentAttr `V.withStyle` V.reverseVideo),
             (attrTerminal, B.fg V.blue),
             (attrUnderlined, V.currentAttr `V.withStyle` V.underline)
           ]
