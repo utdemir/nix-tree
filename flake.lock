@@ -18,11 +18,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1615880991,
-        "narHash": "sha256-hkI/PzSK46MXmysU0jl75QxiEm3ASogIU4PMu2mVQ2Y=",
+        "lastModified": 1616259034,
+        "narHash": "sha256-WlMIiGIXJm7J+jemzd+ksoun6znWmabCZNz76szV158=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "f1e8b1e500f0856820187c41cf4f5202a5f9bce7",
+        "rev": "4e0d3868c679da20108db402785f924daa1a7fb5",
         "type": "github"
       },
       "original": {
@@ -32,10 +32,28 @@
         "type": "github"
       }
     },
+    "qualified-imports-plugin": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1616316764,
+        "narHash": "sha256-rmqEzqD75y3Xns785IHi2JPs+32Z9ahcAcFLsvOKvHw=",
+        "owner": "utdemir",
+        "repo": "qualified-imports-plugin",
+        "rev": "83f9de9ba7b62798f65af2516cdb53ca0f9b0847",
+        "type": "github"
+      },
+      "original": {
+        "owner": "utdemir",
+        "ref": "main",
+        "repo": "qualified-imports-plugin",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "qualified-imports-plugin": "qualified-imports-plugin"
       }
     }
   },

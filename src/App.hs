@@ -8,17 +8,13 @@ import qualified Brick.Widgets.List as B
 import qualified Clipboard
 import Control.Concurrent
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map as Map
-import qualified Data.Sequence as S
-import qualified Data.Set as Set
-import qualified Data.Text as T
 import qualified Graphics.Vty as V
 import InvertedIndex
 import PathStats
 import qualified System.Clock as Clock
 import qualified System.HrfSize as HRF
 
-data Event
+newtype Event
   = EventTick Clock.TimeSpec
 
 data Widgets
@@ -66,7 +62,7 @@ data SortOrder
   deriving (Show, Eq, Enum, Bounded)
 
 compareBySortOrder :: SortOrder -> Path s -> Path s -> Ordering
-compareBySortOrder SortOrderAlphabetical = compare `on` T.toLower . storeNameToShortText . spName
+compareBySortOrder SortOrderAlphabetical = compare `on` Text.toLower . storeNameToShortText . spName
 compareBySortOrder SortOrderClosureSize = compare `on` Down . psTotalSize . spPayload
 compareBySortOrder SortOrderAddedSize = compare `on` Down . psAddedSize . spPayload
 
@@ -92,14 +88,14 @@ run env = do
             aeInvertedIndex =
               ii,
             aePrevPane =
-              B.list WidgetPrevPane S.empty 0,
+              B.list WidgetPrevPane Sequence.empty 0,
             aeCurrPane =
               B.list
                 WidgetCurrPane
-                (S.fromList . sortBy (compareBySortOrder defaultSortOrder) . NE.toList $ seGetRoots env)
+                (Sequence.fromList . sortBy (compareBySortOrder defaultSortOrder) . NE.toList $ seGetRoots env)
                 0,
             aeNextPane =
-              B.list WidgetNextPane S.empty 0,
+              B.list WidgetNextPane Sequence.empty 0,
             aeParents =
               [],
             aeOpenModal =
@@ -134,14 +130,15 @@ renderList ::
   Bool ->
   List s ->
   B.Widget Widgets
-renderList highlightSort isFocused =
-  B.renderList
-    ( \_
-       StorePath
-         { spName,
-           spPayload = PathStats {psTotalSize, psAddedSize},
-           spRefs
-         } ->
+renderList highlightSort =
+  B.renderList (const drawItem)
+  where
+    underlineWhen so =
+      if Just so == highlightSort
+        then B.withDefAttr attrUnderlined
+        else identity
+    drawItem StorePath{ spName, spPayload = PathStats {psTotalSize, psAddedSize}, spRefs } =
+
           let color =
                 if null spRefs
                   then B.withAttr attrTerminal
@@ -167,13 +164,8 @@ renderList highlightSort isFocused =
                             B.txt ")"
                           ]
                   ]
-    )
-    isFocused
-  where
-    underlineWhen so =
-      if Just so == highlightSort
-        then B.withDefAttr attrUnderlined
-        else identity
+    
+        
 
 app :: B.App (AppEnv s) Event Widgets
 app =
@@ -258,7 +250,7 @@ app =
                   Nothing -> B.continue closed
                   Just (_, path) -> B.continue $ selectPath path closed
           -- search modal
-          (B.VtyEvent (V.EvKey V.KEsc []), Just (ModalSearch _ _ _)) ->
+          (B.VtyEvent (V.EvKey V.KEsc []), Just ModalSearch{}) ->
             B.continue s {aeOpenModal = Nothing}
           (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
             | k `elem` [V.KDown, V.KChar '\t'] ->
@@ -270,19 +262,19 @@ app =
             B.continue
               s
                 { aeOpenModal =
-                    Just $ ModalSearch (T.dropEnd 1 l) (T.takeEnd 1 l <> r) (B.listMoveUp xs)
+                    Just $ ModalSearch (Text.dropEnd 1 l) (Text.takeEnd 1 l <> r) (B.listMoveUp xs)
                 }
           (B.VtyEvent (V.EvKey V.KRight []), Just (ModalSearch l r xs)) ->
             B.continue
               s
                 { aeOpenModal =
-                    Just $ ModalSearch (l <> T.take 1 r) (T.drop 1 r) (B.listMoveUp xs)
+                    Just $ ModalSearch (l <> Text.take 1 r) (Text.drop 1 r) (B.listMoveUp xs)
                 }
           (B.VtyEvent (V.EvKey (V.KChar c) []), Just (ModalSearch l r _))
             | c `Set.member` allowedSearchChars ->
-              B.continue (showAndUpdateSearch (l <> T.singleton c) r s)
-          (B.VtyEvent (V.EvKey (V.KBS) []), Just (ModalSearch l r _)) ->
-            B.continue (showAndUpdateSearch (T.dropEnd 1 l) r s)
+              B.continue (showAndUpdateSearch (l <> Text.singleton c) r s)
+          (B.VtyEvent (V.EvKey V.KBS []), Just (ModalSearch l r _)) ->
+            B.continue (showAndUpdateSearch (Text.dropEnd 1 l) r s)
           (B.VtyEvent (V.EvKey V.KEnter []), Just (ModalSearch _ _ xs)) ->
             let closed = s {aeOpenModal = Nothing}
              in case B.listSelectedElement xs of
@@ -302,7 +294,7 @@ app =
           -- ignore otherwise
           _ ->
             B.continue s,
-      B.appStartEvent = \s -> return s,
+      B.appStartEvent = return,
       B.appAttrMap = \_ ->
         B.attrMap
           (V.white `B.on` V.black)
@@ -332,7 +324,7 @@ yankToClipboard p =
         Left $
           Notice
             "Error"
-            ( T.intercalate "\n" $
+            ( Text.intercalate "\n" $
                 "Cannot copy to clipboard: " :
                 map ("  " <>) errs
             )
@@ -361,9 +353,8 @@ renderInfoPane env =
   let selected = selectedPath env
       immediateParents = psImmediateParents $ spPayload selected
    in B.vBox
-        [ ( let (f, s) = storeNameToSplitShortText (spName selected)
-             in B.txt f B.<+> underlineWhen SortOrderAlphabetical (B.txt s)
-          ),
+        [ let (f, s) = storeNameToSplitShortText (spName selected)
+           in B.txt f B.<+> underlineWhen SortOrderAlphabetical (B.txt s),
           [ B.txt $ "NAR Size: " <> prettySize (spSize selected),
             underlineWhen SortOrderClosureSize . B.txt $ "Closure Size: " <> prettySize (psTotalSize $ spPayload selected),
             underlineWhen SortOrderAddedSize . B.txt $ "Added Size: " <> prettySize (psAddedSize $ spPayload selected)
@@ -374,8 +365,8 @@ renderInfoPane env =
             if null immediateParents
               then "Immediate Parents: -"
               else
-                "Immediate Parents (" <> T.pack (show $ length immediateParents) <> "): "
-                  <> T.intercalate ", " (map storeNameToShortText immediateParents)
+                "Immediate Parents (" <> Text.pack (show $ length immediateParents) <> "): "
+                  <> Text.intercalate ", " (map storeNameToShortText immediateParents)
         ]
   where
     underlineWhen so =
@@ -393,7 +384,7 @@ renderModal title widget =
 
 helpText :: Text
 helpText =
-  T.intercalate
+  Text.intercalate
     "\n"
     [ "hjkl/Arrow Keys : Navigate",
       "w               : Open why-depends mode",
@@ -426,7 +417,7 @@ renderWhyDependsModal l =
       xs
         & NE.toList
         & fmap (storeNameToShortText . spName)
-        & T.intercalate " → "
+        & Text.intercalate " → "
 
 showWhyDepends :: AppEnv s -> AppEnv s
 showWhyDepends env@AppEnv {aeActualStoreEnv} =
@@ -435,10 +426,10 @@ showWhyDepends env@AppEnv {aeActualStoreEnv} =
         Just . ModalWhyDepends $
           let selected = selectedPath env
               route = selectedPaths env
-              xs = S.fromList $ whyDepends aeActualStoreEnv (spName selected)
+              xs = Sequence.fromList $ whyDepends aeActualStoreEnv (spName selected)
            in B.list WidgetWhyDepends xs 1
                 & B.listMoveTo
-                  (fromMaybe 0 $ (((==) `on` fmap spName) route) `S.findIndexL` xs)
+                  (fromMaybe 0 $ ((==) `on` fmap spName) route `Sequence.findIndexL` xs)
     }
 
 renderSearchModal :: Text -> Text -> B.GenericList Widgets Seq (Path s) -> B.Widget Widgets
@@ -458,7 +449,7 @@ showAndUpdateSearch left right env@AppEnv {aeInvertedIndex} =
       let xs =
             iiSearch (left <> right) aeInvertedIndex
               & Map.elems
-              & S.fromList
+              & Sequence.fromList
        in B.list WidgetSearch xs 1
 
 move :: (List s -> List s) -> AppEnv s -> AppEnv s
@@ -495,8 +486,8 @@ repopulateNextPane env@AppEnv {aeActualStoreEnv, aeNextPane, aeSortOrder} =
    in env
         { aeNextPane =
             B.listReplace
-              ( S.sortBy (compareBySortOrder aeSortOrder)
-                  . S.fromList
+              ( Sequence.sortBy (compareBySortOrder aeSortOrder)
+                  . Sequence.fromList
                   . map (seLookup aeActualStoreEnv)
                   $ spRefs ref
               )
@@ -509,7 +500,7 @@ sortPane so l =
   let selected = B.listSelectedElement l
       elems =
         B.listElements l
-          & S.sortBy (compareBySortOrder so)
+          & Sequence.sortBy (compareBySortOrder so)
       name = B.getName l
    in mkList so name elems (snd <$> selected)
 
@@ -552,7 +543,7 @@ selectPath path env@AppEnv {aeActualStoreEnv} =
           (NE.toList (seGetRoots aeActualStoreEnv), root)
           children
           & NE.reverse
-          & fmap (\(possible, selected) -> mkList (aeSortOrder env) WidgetPrevPane (S.fromList possible) (Just selected))
+          & fmap (\(possible, selected) -> mkList (aeSortOrder env) WidgetPrevPane (Sequence.fromList possible) (Just selected))
           & (<> (emptyPane :| []))
    in case lists of
         (curr :| prevs) ->
@@ -567,7 +558,7 @@ selectPath path env@AppEnv {aeActualStoreEnv} =
                 & repopulateNextPane
   where
     emptyPane =
-      B.list WidgetPrevPane S.empty 0
+      B.list WidgetPrevPane Sequence.empty 0
 
 mkList ::
   SortOrder ->
@@ -576,17 +567,17 @@ mkList ::
   Maybe (Path s) ->
   B.GenericList n Seq (Path s)
 mkList sortOrder name possible selected =
-  let contents = S.sortBy (compareBySortOrder sortOrder) possible
+  let contents = Sequence.sortBy (compareBySortOrder sortOrder) possible
    in B.list name contents 1
         & B.listMoveTo
-          (fromMaybe 0 $ selected >>= \s -> (((==) `on` spName) s) `S.findIndexL` contents)
+          (fromMaybe 0 $ selected >>= \s -> ((==) `on` spName) s `Sequence.findIndexL` contents)
 
 -- Utils
 
-prettySize :: Int -> T.Text
+prettySize :: Int -> Text.Text
 prettySize size = case HRF.convertSize $ fromIntegral size of
-  HRF.Bytes d -> T.pack (show d)
-  HRF.KiB d -> T.pack (show d) <> " KiB"
-  HRF.MiB d -> T.pack (show d) <> " MiB"
-  HRF.GiB d -> T.pack (show d) <> " GiB"
-  HRF.TiB d -> T.pack (show d) <> " TiB"
+  HRF.Bytes d -> Text.pack (show d)
+  HRF.KiB d -> Text.pack (show d) <> " KiB"
+  HRF.MiB d -> Text.pack (show d) <> " MiB"
+  HRF.GiB d -> Text.pack (show d) <> " GiB"
+  HRF.TiB d -> Text.pack (show d) <> " TiB"

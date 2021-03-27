@@ -2,11 +2,16 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils/master";
+
+    qualified-imports-plugin = {
+      url = "github:utdemir/qualified-imports-plugin/main";
+      flake = false;
+    };
   };
 
   description = "Interactively browse the dependency graph of your Nix derivations.";
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, qualified-imports-plugin }:
     let
       overlay = self: super: {
         haskellPackages = super.haskellPackages.override {
@@ -19,6 +24,11 @@
                     !(builtins.elem (builtins.baseNameOf path) [ "asciicast.sh" "flake.nix" ]);
                   src = ./.;
                 })
+                { };
+            qualified-imports-plugin =
+              hself.callCabal2nix
+                "qualified-imports-plugin"
+                qualified-imports-plugin
                 { };
           };
         };
@@ -38,6 +48,7 @@
             p."nix-tree"
           ];
           buildInputs = with pkgs.haskellPackages; [
+            haskell-language-server
             cabal-install
             ghcid
             ormolu

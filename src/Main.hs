@@ -2,7 +2,6 @@ module Main where
 
 import App
 import Control.Concurrent (forkIO)
-import qualified Data.HashMap.Strict as HM
 import Data.Version (showVersion)
 import PathStats
 import Paths_nix_tree (version)
@@ -63,8 +62,8 @@ main = do
           let (newRemaining, foundNodes) =
                 foldl'
                   ( \(nr, fs) n ->
-                      ( HM.delete n nr,
-                        HM.lookup n nr : fs
+                      ( HashMap.delete n nr,
+                        HashMap.lookup n nr : fs
                       )
                   )
                   (remaining, [])

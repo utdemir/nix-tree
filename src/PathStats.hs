@@ -9,12 +9,10 @@ where
 
 import Data.List (minimumBy)
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map.Lazy as M
-import qualified Data.Set as S
 import StorePath
 
 data IntermediatePathStats s = IntermediatePathStats
-  { ipsAllRefs :: M.Map (StoreName s) (StorePath s (StoreName s) ())
+  { ipsAllRefs :: Map (StoreName s) (StorePath s (StoreName s) ())
   }
 
 data PathStats s = PathStats
@@ -32,8 +30,8 @@ mkIntermediateEnv env =
   seBottomUp $ \curr ->
     IntermediatePathStats
       { ipsAllRefs =
-          M.unions
-            ( M.fromList
+          Map.unions
+            ( Map.fromList
                 [ (spName, const () <$> sp)
                   | sp@StorePath {spName} <- spRefs curr,
                     env spName
@@ -57,7 +55,7 @@ mkFinalEnv env =
                     + calculateRefsSize (ipsAllRefs spPayload),
                 psAddedSize = addedSize,
                 psImmediateParents =
-                  maybe [] S.toList $ M.lookup spName immediateParents
+                  maybe [] Set.toList $ Map.lookup spName immediateParents
               }
   where
     calculateEnvSize :: StoreEnv s (IntermediatePathStats s) -> Int
@@ -66,28 +64,28 @@ mkFinalEnv env =
         & toList
         & map
           ( \sp@StorePath {spName, spPayload} ->
-              M.insert
+              Map.insert
                 spName
                 (const () <$> sp)
                 (ipsAllRefs spPayload)
           )
-        & M.unions
+        & Map.unions
         & calculateRefsSize
     calculateRefsSize :: (Functor f, Foldable f) => f (StorePath s a b) -> Int
     calculateRefsSize = sum . fmap spSize
     calculateImmediateParents ::
       (Foldable f) =>
       f (StorePath s (StoreName s) b) ->
-      M.Map (StoreName s) (S.Set (StoreName s))
+      Map (StoreName s) (Set.Set (StoreName s))
     calculateImmediateParents =
       foldl'
         ( \m StorePath {spName, spRefs} ->
-            M.unionWith
+            Map.unionWith
               (<>)
               m
-              (M.fromList (map (\r -> (r, S.singleton spName)) spRefs))
+              (Map.fromList (map (\r -> (r, Set.singleton spName)) spRefs))
         )
-        M.empty
+        Map.empty
 
 calculatePathStats :: StoreEnv s () -> StoreEnv s (PathStats s)
 calculatePathStats = mkFinalEnv . mkIntermediateEnv (const True)

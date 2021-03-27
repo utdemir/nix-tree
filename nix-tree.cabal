@@ -17,6 +17,8 @@ extra-source-files:  README.md, CHANGELOG.md
 common common-options
   ghc-options:        -threaded
                       -Wall -Wpartial-fields -Wincomplete-record-updates -Widentities
+                      -fplugin=QualifiedImportsPlugin
+                      -fplugin-opt=QualifiedImportsPlugin:Data.Sequence:Sequence
   default-language:   Haskell2010
   default-extensions: LambdaCase
                       OverloadedStrings
@@ -47,16 +49,16 @@ common common-options
                     , relude (Relude as Prelude)
   build-depends:      base
                     , relude
+                    , text
                     , aeson
+                    , qualified-imports-plugin
                     , brick
                     , bytestring
                     , containers
                     , clock
-                    , deepseq
                     , filepath
                     , hashable
                     , hrfsize
-                    , text
                     , transformers
                     , typed-process
                     , unordered-containers

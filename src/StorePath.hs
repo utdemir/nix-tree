@@ -18,12 +18,8 @@ module StorePath
 where
 
 import Data.Aeson (FromJSON (..), Value (..), decode, (.:))
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.HashMap.Strict as HM
-import qualified Data.HashSet as HS
 import Data.List (partition)
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Text as T
 import System.FilePath.Posix (addTrailingPathSeparator, splitDirectories, (</>))
 import System.Process.Typed (proc, readProcessStdout_)
 
@@ -66,8 +62,8 @@ storeNameToShortText = snd . storeNameToSplitShortText
 
 storeNameToSplitShortText :: StoreName a -> (Text, Text)
 storeNameToSplitShortText txt =
-  case T.span (/= '-') . T.pack $ storeNameToPath txt of
-    (f, s) | Just (c, s'') <- T.uncons s -> (T.snoc f c, s'')
+  case Text.span (/= '-') . Text.pack $ storeNameToPath txt of
+    (f, s) | Just (c, s'') <- Text.uncons s -> (Text.snoc f c, s'')
     e -> e
 
 --------------------------------------------------------------------------------
@@ -94,7 +90,7 @@ mkStorePaths names = do
   isAtLeastNix24 <- (>= Just "2.4") <$> getNixVersion
   let (derivations, outputs) =
         partition
-          (\i -> ".drv" `T.isSuffixOf` storeNameToText i)
+          (\i -> ".drv" `Text.isSuffixOf` storeNameToText i)
           (NE.toList names)
   (++)
     <$> maybe (return []) (getPathInfo nixStore False) (NE.nonEmpty outputs)
@@ -102,8 +98,8 @@ mkStorePaths names = do
   where
     getNixVersion :: IO (Maybe Text)
     getNixVersion = do
-      out <- decodeUtf8 . BL.toStrict <$> readProcessStdout_ (proc "nix" ["--version"])
-      return . viaNonEmpty last $ T.splitOn " " out
+      out <- decodeUtf8 . LByteString.toStrict <$> readProcessStdout_ (proc "nix" ["--version"])
+      return . viaNonEmpty last $ Text.splitOn " " out
 
 getPathInfo :: NixStore -> Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
 getPathInfo nixStore isDrv names = do
@@ -174,7 +170,7 @@ withStoreEnv fnames cb = do
               StoreEnv
                 ( paths
                     & map (\p@StorePath {spName} -> (spName, p))
-                    & HM.fromList
+                    & HashMap.fromList
                 )
                 names
         Right <$> cb env
@@ -183,10 +179,10 @@ seLookup :: StoreEnv s a -> StoreName s -> StorePath s (StoreName s) a
 seLookup StoreEnv {sePaths} name =
   fromMaybe
     (error $ "invariant violation, StoreName not found: " <> show name)
-    (HM.lookup name sePaths)
+    (HashMap.lookup name sePaths)
 
 seAll :: StoreEnv s a -> NonEmpty (StorePath s (StoreName s) a)
-seAll StoreEnv {sePaths} = case HM.elems sePaths of
+seAll StoreEnv {sePaths} = case HashMap.elems sePaths of
   [] -> error "invariant violation: no paths"
   (x : xs) -> x :| xs
 
@@ -203,16 +199,16 @@ seFetchRefs env predicate =
   fst
     . foldl'
       (\(acc, visited) name -> go acc visited name)
-      ([], HS.empty)
+      ([], HashSet.empty)
   where
     go acc visited name
-      | HS.member name visited = (acc, visited)
+      | HashSet.member name visited = (acc, visited)
       | not (predicate name) = (acc, visited)
       | otherwise =
         let sp@StorePath {spRefs} = seLookup env name
          in foldl'
               (\(acc', visited') name' -> go acc' visited' name')
-              (sp : acc, HS.insert name visited)
+              (sp : acc, HashSet.insert name visited)
               spRefs
 
 seBottomUp ::
@@ -222,14 +218,14 @@ seBottomUp ::
   StoreEnv s b
 seBottomUp f StoreEnv {sePaths, seRoots} =
   StoreEnv
-    { sePaths = snd $ execState (mapM_ go seRoots) (sePaths, HM.empty),
+    { sePaths = snd $ execState (mapM_ go seRoots) (sePaths, HashMap.empty),
       seRoots
     }
   where
     unsafeLookup k m =
       fromMaybe
         (error $ "invariant violation: name doesn't exists: " <> show k)
-        (HM.lookup k m)
+        (HashMap.lookup k m)
     go ::
       StoreName s ->
       State
@@ -239,7 +235,7 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
         (StorePath s (StoreName s) b)
     go name = do
       processed <- gets snd
-      case name `HM.lookup` processed of
+      case name `HashMap.lookup` processed of
         Just sp -> return sp
         Nothing -> do
           sp@StorePath {spName, spRefs} <- unsafeLookup name <$> gets fst
@@ -247,8 +243,8 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
           let new = sp {spPayload = f sp {spRefs = refs}}
           modify
             ( \(as, bs) ->
-                ( HM.delete spName as,
-                  HM.insert spName new bs
+                ( HashMap.delete spName as,
+                  HashMap.insert spName new bs
                 )
             )
           return new

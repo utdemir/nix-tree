@@ -6,10 +6,6 @@ module InvertedIndex
   )
 where
 
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Data.Text as Text
-
 data InvertedIndex a = InvertedIndex
   { iiElems :: Map Text a,
     iiUnigrams :: Map Char (Set Text),
@@ -24,7 +20,7 @@ iiInsert :: Text -> a -> InvertedIndex a -> InvertedIndex a
 iiInsert txt val InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams} =
   InvertedIndex
     { iiElems = Map.insert txt val iiElems,
-      iiUnigrams = combine iiUnigrams (unigramsOf txt),
+      iiUnigrams =  combine iiUnigrams (unigramsOf txt),
       iiBigrams = combine iiBigrams (bigramsOf txt),
       iiTrigrams = combine iiTrigrams (trigramsOf txt)
     }
