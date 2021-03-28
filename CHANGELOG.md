@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.7 - 2021-03-28
 
 * feat: Ability to yank selected store path to clipboard (shortcut: 'y')
 * fix: Try to respect terminals color scheme (thanks @kanashimia)
