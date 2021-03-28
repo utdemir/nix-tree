@@ -3,6 +3,7 @@
 ## Unreleased
 
 * feat: Ability to yank selected store path to clipboard (shortcut: 'y')
+* fix: Try to respect terminals color scheme (thanks @kanashimia)
 
 ## 0.1.6 - 2021-03-12
 
