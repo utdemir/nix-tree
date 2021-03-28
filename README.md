@@ -25,16 +25,16 @@ nix profile install github:utdemir/nix-tree
 
 ```
 $ nix-tree --help
-nix-tree --help
-Usage: nix-tree [paths] [-h|--help]
+Usage: nix-tree [paths...] [-h|--help] [--version]
   Paths default to $HOME/.nix-profile and /var/run/current-system.
 Keybindings:
   hjkl/Arrow Keys : Navigate
-  q/Esc:          : Quit / close modal
   w               : Open why-depends mode
   /               : Open search mode
   s               : Change sort order
+  y               : Yank selected path to clipboard
   ?               : Show help
+  q/Esc:          : Quit / close modal
 ```
 
 ### Glossary
