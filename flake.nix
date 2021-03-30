@@ -39,6 +39,7 @@
           ];
           buildInputs = with pkgs.haskellPackages; [
             cabal-install
+            haskell-language-server
             ghcid
             ormolu
             hlint
