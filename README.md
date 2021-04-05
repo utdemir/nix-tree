@@ -3,22 +3,30 @@
 ![Build Status](https://github.com/utdemir/nix-tree/workflows/nix-build/badge.svg)
 [![Packaging status](https://repology.org/badge/vertical-allrepos/haskell:nix-tree.svg)](https://repology.org/project/haskell:nix-tree/versions)
 
-Interactively browse the dependency graph of your Nix derivations.
+Interactively browse the dependency graph of Nix derivations.
 
 [![asciicast](https://asciinema.org/a/cnilbmPXW51g97hdNJZcM5F6h.svg)](https://asciinema.org/a/cnilbmPXW51g97hdNJZcM5F6h)
 
 ## Installation
 
-Stable version:
+`nix-tree` is on `nixpkgs` since `20.09`, so just use your preferred method for adding packages to your system, eg:
 
 ```
 nix-env -i nix-tree
 ```
 
-Development version (requires Nix with flake support):
+To run the current development version:
+
+* With flakes:
 
 ```
-nix profile install github:utdemir/nix-tree
+nix run github:utdemir/nix-tree
+```
+
+* Without flakes:
+
+```
+nix-shell -I nix-tree=https://github.com/utdemir/nix-tree/archive/refs/heads/main.zip -p '(import <nix-tree>).default'  
 ```
 
 ## Usage
@@ -66,13 +74,13 @@ nix-build shell.nix -A inputDerivation | xargs -o nix-tree
 nix-build '<nixpkgs>' -A openssl.all --no-out-link | xargs -o nix-tree
 ```
 
-## Hacking
+## Contributing
 
 All contributions, issues and feature requests are welcome.
 
-To hack on it, simply run `nix-shell` (or `nix develop`) and use `cabal` as usual.
+To hack on it, simply run `nix-shell` (or `nix develop`) and use `cabal` as usual. Please run `./format.sh` before sending a PR.
 
-# Related tools
+## Related tools
 
 * [nix-du](https://github.com/symphorien/nix-du)
 * [nix-query-tree-viewer](https://github.com/cdepillabout/nix-query-tree-viewer)
