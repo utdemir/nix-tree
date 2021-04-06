@@ -1,6 +1,7 @@
 name: "update && nix-build"
 on:
-  - cron:  '0 0 * * *'
+  schedule:
+    - cron:  '0 0 * * *'
 jobs:
   build:
     strategy:
