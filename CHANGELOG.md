@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleaased:
+
+* fix: Reduce idle CPU use
+
 ## 0.1.7 - 2021-03-28
 
 * feat: Ability to yank selected store path to clipboard (shortcut: 'y')

@@ -117,7 +117,7 @@ run env = do
   chan <- B.newBChan 10
   void . forkIO $
     forever $ do
-      threadDelay (100 * 100)
+      threadDelay (100 * 1000)
       t <- getTime
       _ <- B.writeBChanNonBlocking chan (EventTick t)
       return ()
