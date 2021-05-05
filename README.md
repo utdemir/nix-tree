@@ -17,16 +17,10 @@ nix-env -i nix-tree
 
 To run the current development version:
 
-* With flakes:
-
-```
-nix run github:utdemir/nix-tree
-```
-
 * Without flakes:
 
 ```
-nix-shell -I nix-tree=https://github.com/utdemir/nix-tree/archive/refs/heads/main.zip -p '(import <nix-tree>).default'  
+nix-shell -I nix-tree=https://github.com/utdemir/nix-tree/archive/refs/heads/main.zip -p '(import <nix-tree>).nix-tree'
 ```
 
 ## Usage

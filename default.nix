@@ -5,10 +5,22 @@ in
 { pkgs ? import sources.nixpkgs {} }:
 
 let
+  nix-filter = import sources.nix-filter;
+  src = nix-filter {
+    root = ./.;
+    include = with nix-filter; [
+      (and
+        (or_ (inDirectory "src") (inDirectory "test"))
+        (or_ isDirectory (matchExt "hs")))
+      ./nix-tree.cabal
+      ./README.md ./CHANGELOG.md ./LICENSE
+    ];
+  };
+
   myHaskellPackages = pkgs.haskellPackages.override {
     overrides = hself: hsuper: {
       "nix-tree" =
-        hself.callCabal2nix "nix-tree" (builtins.fetchGit ./.) {};
+        hself.callCabal2nix "nix-tree" src {};
     };
   };
 
