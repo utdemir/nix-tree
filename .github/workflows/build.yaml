@@ -16,4 +16,3 @@ jobs:
         name: utdemir
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
     - run: nix-build
-    - run: nix-shell --command 'echo' 'ok.'
