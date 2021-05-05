@@ -17,10 +17,8 @@ nix-env -i nix-tree
 
 To run the current development version:
 
-* Without flakes:
-
 ```
-nix-shell -I nix-tree=https://github.com/utdemir/nix-tree/archive/refs/heads/main.zip -p '(import <nix-tree>).nix-tree'
+nix-shell -p '(import (builtins.fetchTarball "https://github.com/utdemir/nix-tree/archive/main.tar.gz") {}).nix-tree' --run nix-tree
 ```
 
 ## Usage
@@ -72,7 +70,7 @@ nix-build '<nixpkgs>' -A openssl.all --no-out-link | xargs -o nix-tree
 
 All contributions, issues and feature requests are welcome.
 
-To hack on it, simply run `nix-shell` (or `nix develop`) and use `cabal` as usual. Please run `./format.sh` before sending a PR.
+To hack on it, simply run `nix-shell` and use `cabal` as usual. Please run `./format.sh` before sending a PR.
 
 ## Related tools
 

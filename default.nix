@@ -2,7 +2,7 @@ let
   sources = import ./nix/sources.nix;
 in
 
-{ pkgs ? import sources.nixpkgs {} }:
+{ pkgs ? import sources.nixpkgs { } }:
 
 let
   nix-filter = import sources.nix-filter;
@@ -13,14 +13,16 @@ let
         (or_ (inDirectory "src") (inDirectory "test"))
         (or_ isDirectory (matchExt "hs")))
       ./nix-tree.cabal
-      ./README.md ./CHANGELOG.md ./LICENSE
+      ./README.md
+      ./CHANGELOG.md
+      ./LICENSE
     ];
   };
 
   myHaskellPackages = pkgs.haskellPackages.override {
     overrides = hself: hsuper: {
       "nix-tree" =
-        hself.callCabal2nix "nix-tree" src {};
+        hself.callCabal2nix "nix-tree" src { };
     };
   };
 
