@@ -1,5 +1,3 @@
-*.lock
-
 # nix
 result
 result-*
