@@ -6,6 +6,7 @@ where
 import Control.Exception (try)
 import System.Exit
 import qualified System.Process.Typed as P
+import System.Timeout
 
 cmds :: [(FilePath, [String])]
 cmds =
@@ -20,13 +21,13 @@ runCmd txt (cmd, args) =
   P.proc (toString cmd) (map toString args)
     & P.setStdin (P.byteStringInput $ encodeUtf8 txt)
     & P.readProcess
+    & timeout 1_000_000
     & try
     <&> \case
-      (Right (ExitSuccess, _, _)) -> Right ()
-      (Right (ExitFailure e, out, err)) ->
+      Right (Just (ExitSuccess, _, _)) -> Right ()
+      Right (Just (ExitFailure e, out, err)) ->
         Left $
-          "Running " <> show (cmd, args) <> " "
-            <> "failed with exit code "
+             "failed with exit code "
             <> show e
             <> ", "
             <> "stdout: "
@@ -34,13 +35,13 @@ runCmd txt (cmd, args) =
             <> ", "
             <> "stderr: "
             <> decodeUtf8 (toStrict err)
-            <> "."
-      (Left (ex :: SomeException)) ->
-        Left $
-          "Running " <> show (cmd, args) <> " "
-            <> "failed with exception: "
-            <> show ex
-            <> "."
+      Right Nothing ->
+        Left $ "timed out"
+      Left (ex :: SomeException) ->
+        Left $ "failed with exception: " <> show ex
+    <&> \case
+      Right () -> Right ()
+      Left err -> Left ("Running " <> show (cmd, args) <> " " <> err <> ".")
 
 copy :: Text -> IO (Either [Text] ())
 copy txt = go cmds []

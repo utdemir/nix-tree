@@ -335,6 +335,7 @@ yankToClipboard p =
             ( T.intercalate "\n" $
                 "Cannot copy to clipboard: " :
                 map ("  " <>) errs
+                ++ ["Please report this as a bug."]
             )
 
 renderMainScreen :: AppEnv s -> B.Widget Widgets
