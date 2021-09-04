@@ -1,4 +1,4 @@
-module Clipboard
+module NixTree.Clipboard
   ( copy,
   )
 where
@@ -27,7 +27,7 @@ runCmd txt (cmd, args) =
       Right (Just (ExitSuccess, _, _)) -> Right ()
       Right (Just (ExitFailure e, out, err)) ->
         Left $
-             "failed with exit code "
+          "failed with exit code "
             <> show e
             <> ", "
             <> "stdout: "

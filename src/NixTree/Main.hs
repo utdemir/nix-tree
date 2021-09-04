@@ -1,10 +1,10 @@
 module Main where
 
-import App
+import NixTree.App
 import Control.Concurrent (forkIO)
 import qualified Data.HashMap.Strict as HM
 import Data.Version (showVersion)
-import PathStats
+import NixTree.PathStats
 import Paths_nix_tree (version)
 import System.Directory (canonicalizePath, doesDirectoryExist, getHomeDirectory)
 import System.Environment (getArgs)

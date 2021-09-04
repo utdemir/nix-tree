@@ -1,4 +1,4 @@
-module InvertedIndex
+module Data.InvertedIndex
   ( InvertedIndex,
     iiFromList,
     iiInsert,

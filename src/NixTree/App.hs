@@ -1,20 +1,20 @@
-module App (run, helpText) where
+module NixTree.App (run, helpText) where
 
 import qualified Brick as B
 import qualified Brick.BChan as B
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
-import qualified Clipboard
 import Control.Concurrent
+import Data.InvertedIndex
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Sequence as S
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Graphics.Vty as V
-import InvertedIndex
-import PathStats
+import qualified NixTree.Clipboard as Clipboard
+import NixTree.PathStats
 import qualified System.Clock as Clock
 import qualified System.HrfSize as HRF
 
@@ -335,7 +335,7 @@ yankToClipboard p =
             ( T.intercalate "\n" $
                 "Cannot copy to clipboard: " :
                 map ("  " <>) errs
-                ++ ["Please report this as a bug."]
+                  ++ ["Please report this as a bug."]
             )
 
 renderMainScreen :: AppEnv s -> B.Widget Widgets

@@ -1,9 +1,9 @@
-module PathStats
+module NixTree.PathStats
   ( PathStats (..),
     calculatePathStats,
     whyDepends,
     shortestPathTo,
-    module StorePath,
+    module NixTree.StorePath,
   )
 where
 
@@ -11,7 +11,7 @@ import Data.List (minimumBy)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Lazy as M
 import qualified Data.Set as S
-import StorePath
+import NixTree.StorePath
 
 data IntermediatePathStats s = IntermediatePathStats
   { ipsAllRefs :: M.Map (StoreName s) (StorePath s (StoreName s) ())

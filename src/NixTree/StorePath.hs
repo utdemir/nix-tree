@@ -1,4 +1,4 @@
-module StorePath
+module NixTree.StorePath
   ( StoreName (..),
     storeNameToPath,
     storeNameToText,
