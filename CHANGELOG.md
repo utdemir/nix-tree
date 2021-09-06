@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleaased:
+## 0.1.8 - 2021-09-06:
 
 * fix: Reduce idle CPU use
 * fix: Put a timeout on yank command
