@@ -4,6 +4,7 @@
 
 * fix: Reduce idle CPU use
 * fix: Put a timeout on yank command
+* fix: Various performance improvements
 
 ## 0.1.7 - 2021-03-28
 
