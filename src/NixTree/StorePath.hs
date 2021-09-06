@@ -27,8 +27,22 @@ import qualified Data.Text as T
 import System.FilePath.Posix (addTrailingPathSeparator, splitDirectories, (</>))
 import System.Process.Typed (proc, readProcessStdout_)
 
-newtype NixStore = NixStore FilePath
-  deriving newtype (Show, Eq, Ord, NFData, Hashable)
+-- Technically these both are filepaths. However, most people use the default "/nix/store",
+-- hence special casing it speeds things up.
+data NixStore
+  = NixStore
+  | NixStoreCustom FilePath
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving anyclass (NFData, Hashable)
+
+mkNixStore :: FilePath -> NixStore
+mkNixStore i' =
+  let i = addTrailingPathSeparator i'
+   in if i == "/nix/store/" then NixStore else NixStoreCustom i
+
+unNixStore :: NixStore -> FilePath
+unNixStore NixStore = "/nix/store/"
+unNixStore (NixStoreCustom fp) = fp
 
 getNixStore :: IO NixStore
 getNixStore = do
@@ -36,8 +50,7 @@ getNixStore = do
       args = ["--eval", "--expr", "(builtins.storeDir)", "--json"]
   out <-
     readProcessStdout_ (proc prog args)
-      <&> fmap addTrailingPathSeparator . decode @FilePath
-      <&> fmap NixStore
+      <&> fmap mkNixStore . decode @FilePath
   case out of
     Nothing -> fail $ "Error interpreting output of: " ++ show (prog, args)
     Just p -> return p
@@ -49,7 +62,8 @@ data StoreName s = StoreName NixStore Text
   deriving anyclass (NFData, Hashable)
 
 mkStoreName :: NixStore -> FilePath -> Maybe (StoreName a)
-mkStoreName ns@(NixStore ps) path = do
+mkStoreName ns path = do
+  let ps = unNixStore ns
   guard $ ps `isPrefixOf` path
   let ds = splitDirectories (drop (length ps) path)
   sn <- listToMaybe ds
@@ -59,7 +73,7 @@ storeNameToText :: StoreName a -> Text
 storeNameToText (StoreName _ n) = n
 
 storeNameToPath :: StoreName a -> FilePath
-storeNameToPath (StoreName (NixStore ns) sn) = ns </> toString sn
+storeNameToPath (StoreName ns sn) = unNixStore ns </> toString sn
 
 storeNameToShortText :: StoreName a -> Text
 storeNameToShortText = snd . storeNameToSplitShortText
