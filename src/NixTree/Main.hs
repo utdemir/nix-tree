@@ -1,9 +1,9 @@
 module Main where
 
-import NixTree.App
-import Control.Concurrent (forkIO)
-import qualified Data.HashMap.Strict as HM
+import Control.Concurrent.Async
+import Control.Exception (evaluate)
 import Data.Version (showVersion)
+import NixTree.App
 import NixTree.PathStats
 import Paths_nix_tree (version)
 import System.Directory (canonicalizePath, doesDirectoryExist, getHomeDirectory)
@@ -11,6 +11,7 @@ import System.Environment (getArgs)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO (hPutStr, hPutStrLn)
+import System.ProgressBar hiding (msg)
 
 usage :: Text
 usage =
@@ -55,26 +56,13 @@ main = do
   storePaths <- mapM canonicalizePath paths
   ret <- withStoreEnv storePaths $ \env' -> do
     let env = calculatePathStats env'
+        allPaths = seAll env
 
-    -- Small hack to evaluate the tree branches with a breadth-first
-    -- traversal in the background
-    let go _ [] = return ()
-        go remaining nodes = do
-          let (newRemaining, foundNodes) =
-                foldl'
-                  ( \(nr, fs) n ->
-                      ( HM.delete n nr,
-                        HM.lookup n nr : fs
-                      )
-                  )
-                  (remaining, [])
-                  nodes
-          evaluateNF_ foundNodes
-          go
-            newRemaining
-            (concatMap (maybe [] spRefs) foundNodes)
-
-    _ <- forkIO $ go (sePaths env) (toList $ seRoots env)
+    bar <- newProgressBar defStyle {stylePostfix = exact} 4 (Progress 0 (length allPaths) ())
+    allPaths
+      & toList
+      & chunks 50
+      & mapConcurrently_ (mapM_ (\p -> evaluate (rnf p) >> incProgress bar 1))
 
     run env
 
@@ -82,3 +70,9 @@ main = do
     Right () -> return ()
     Left err ->
       usageAndFail $ "Not a store path: " <> show err
+
+chunks :: Int -> [a] -> [[a]]
+chunks _ [] = []
+chunks n xs =
+  let (ys, zs) = splitAt n xs
+   in ys : chunks n zs
