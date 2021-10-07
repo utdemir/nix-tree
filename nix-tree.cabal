@@ -41,8 +41,6 @@ common common-options
                       NixTree.App
                       Data.InvertedIndex
                       NixTree.Clipboard
-                      Paths_nix_tree
-  autogen-modules:    Paths_nix_tree
   mixins:             base hiding (Prelude)
                     , relude (Relude as Prelude)
   build-depends:      base

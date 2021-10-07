@@ -1,17 +1,20 @@
+{-# LANGUAGE CPP #-}
+
 module Main where
 
 import Control.Concurrent.Async
 import Control.Exception (evaluate)
-import Data.Version (showVersion)
 import NixTree.App
 import NixTree.PathStats
-import Paths_nix_tree (version)
 import System.Directory (canonicalizePath, doesDirectoryExist, getHomeDirectory)
 import System.Environment (getArgs)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO (hPutStr, hPutStrLn)
 import System.ProgressBar hiding (msg)
+
+version ::  Text
+version = VERSION_nix_tree
 
 usage :: Text
 usage =
@@ -36,7 +39,7 @@ main = do
     exitWith ExitSuccess
 
   when ("--version" `elem` args) $ do
-    putStrLn $ "nix-tree " ++ showVersion version
+    putTextLn $ "nix-tree " <> version
     exitWith ExitSuccess
 
   paths <- case args of
