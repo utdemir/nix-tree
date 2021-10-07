@@ -13,7 +13,7 @@ import System.FilePath ((</>))
 import System.IO (hPutStr, hPutStrLn)
 import System.ProgressBar hiding (msg)
 
-version ::  Text
+version :: Text
 version = VERSION_nix_tree
 
 usage :: Text
