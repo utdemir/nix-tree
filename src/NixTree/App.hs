@@ -18,6 +18,9 @@ import NixTree.PathStats
 import qualified System.Clock as Clock
 import qualified System.HrfSize as HRF
 
+sortOrderChangeHighlightPeriod :: Clock.TimeSpec
+sortOrderChangeHighlightPeriod = Clock.TimeSpec 0 (500 * 1_000_000)
+
 data Event
   = EventTick Clock.TimeSpec
 
@@ -297,8 +300,11 @@ app =
             | k `elem` [V.KChar 'q', V.KEsc] ->
               B.continue s {aeOpenModal = Nothing}
           -- handle our events
-          (B.AppEvent (EventTick t), Nothing) ->
-            B.continue $ s {aeCurrTime = t}
+          (B.AppEvent (EventTick t), _) ->
+            let new = s {aeCurrTime = t}
+             in if timePassedSinceSortOrderChange new <= sum (replicate 2 sortOrderChangeHighlightPeriod)
+                  then B.continue new
+                  else B.continueWithoutRedraw new
           -- ignore otherwise
           _ ->
             B.continue s,
@@ -338,6 +344,9 @@ yankToClipboard p =
                   ++ ["Please report this as a bug."]
             )
 
+timePassedSinceSortOrderChange :: AppEnv s -> Clock.TimeSpec
+timePassedSinceSortOrderChange env = Clock.diffTimeSpec (aeCurrTime env) (aeSortOrderLastChanged env)
+
 renderMainScreen :: AppEnv s -> B.Widget Widgets
 renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
   (B.joinBorders . B.border)
@@ -352,10 +361,9 @@ renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
     B.<=> renderInfoPane env
   where
     shouldHighlightSortOrder =
-      let timePassed = Clock.diffTimeSpec (aeCurrTime env) (aeSortOrderLastChanged env)
-       in if timePassed < Clock.TimeSpec 0 (500 * 1_000_000)
-            then Just (aeSortOrder env)
-            else Nothing
+      if timePassedSinceSortOrderChange env < sortOrderChangeHighlightPeriod
+        then Just (aeSortOrder env)
+        else Nothing
 
 renderInfoPane :: AppEnv s -> B.Widget Widgets
 renderInfoPane env =

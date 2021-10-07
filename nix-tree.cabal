@@ -46,7 +46,7 @@ common common-options
   build-depends:      base
                     , relude
                     , aeson
-                    , brick
+                    , brick >= 0.64
                     , bytestring
                     , containers
                     , clock
