@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* fix: Do not refresh screen periodically unless necessary
+
 ## 0.1.8 - 2021-09-06:
 
 * fix: Reduce idle CPU use
