@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* fix: Automatically enable the required 'nix-command' experimental feature on Nix >= 2.4
 * fix: Do not refresh screen periodically unless necessary
 
 ## 0.1.8 - 2021-09-06:

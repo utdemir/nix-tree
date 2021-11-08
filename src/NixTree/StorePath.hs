@@ -106,28 +106,30 @@ mkStorePaths names = do
   -- > the output of given derivation; to actually work on the derivation you need to pass
   -- > --derivation.
   isAtLeastNix24 <- (>= Just "2.4") <$> getNixVersion
+
   let (derivations, outputs) =
         partition
           (\i -> ".drv" `T.isSuffixOf` storeNameToText i)
           (NE.toList names)
   (++)
-    <$> maybe (return []) (getPathInfo nixStore False) (NE.nonEmpty outputs)
-    <*> maybe (return []) (getPathInfo nixStore (True && isAtLeastNix24)) (NE.nonEmpty derivations)
+    <$> maybe (return []) (getPathInfo nixStore isAtLeastNix24 False) (NE.nonEmpty outputs)
+    <*> maybe (return []) (getPathInfo nixStore isAtLeastNix24 True) (NE.nonEmpty derivations)
   where
     getNixVersion :: IO (Maybe Text)
     getNixVersion = do
       out <- decodeUtf8 . BL.toStrict <$> readProcessStdout_ (proc "nix" ["--version"])
       return . viaNonEmpty last $ T.splitOn " " out
 
-getPathInfo :: NixStore -> Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
-getPathInfo nixStore isDrv names = do
+getPathInfo :: NixStore -> Bool -> Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
+getPathInfo nixStore isAtLeastNix24 isDrv names = do
   infos <-
     decode @[NixPathInfoResult]
       <$> readProcessStdout_
         ( proc
             "nix"
             ( ["path-info", "--recursive", "--json"]
-                ++ (if isDrv then ["--derivation"] else [])
+                ++ (if isAtLeastNix24 then ["--extra-experimental-features", "nix-command"] else [])
+                ++ (if isDrv && isAtLeastNix24 then ["--derivation"] else [])
                 ++ map storeNameToPath (toList names)
             )
         )
