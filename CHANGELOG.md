@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.9 - 2021-11-08:
 
 * fix: Automatically enable the required 'nix-command' experimental feature on Nix >= 2.4
 * fix: Do not refresh screen periodically unless necessary
