@@ -4,7 +4,7 @@
 
 * feat: Support passing flake references (issue: [#27][])
   * Try `nix-tree nixpkgs#hello'
-* change: `nix-tree` now requires an explicit `--derivation` flag to work on store derivation rather than its outputs.
+* change: `nix-tree` now requires an explicit `--derivation` flag to work on store derivations rather than their outputs.
   * This is to be more consistent `nix path-info`.
 
 [#27]: https://github.com/utdemir/nix-tree/issues/27
