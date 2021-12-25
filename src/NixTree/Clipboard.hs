@@ -20,21 +20,13 @@ runCmd :: Text -> (FilePath, [String]) -> IO (Either Text ())
 runCmd txt (cmd, args) =
   P.proc (toString cmd) (map toString args)
     & P.setStdin (P.byteStringInput $ encodeUtf8 txt)
-    & P.readProcess
+    & P.runProcess
     & timeout 1_000_000
     & try
     <&> \case
-      Right (Just (ExitSuccess, _, _)) -> Right ()
-      Right (Just (ExitFailure e, out, err)) ->
-        Left $
-          "failed with exit code "
-            <> show e
-            <> ", "
-            <> "stdout: "
-            <> decodeUtf8 (toStrict out)
-            <> ", "
-            <> "stderr: "
-            <> decodeUtf8 (toStrict err)
+      Right (Just ExitSuccess) -> Right ()
+      Right (Just (ExitFailure e)) ->
+        Left $ "failed with exit code " <> show e
       Right Nothing ->
         Left $ "timed out"
       Left (ex :: SomeException) ->
