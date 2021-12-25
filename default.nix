@@ -24,7 +24,7 @@ let
       "nix-tree" =
         hself.callCabal2nix "nix-tree" src { };
       "brick" =
-        hself.brick_0_64_1;
+        hself.brick_0_64_2;
     };
   };
 
