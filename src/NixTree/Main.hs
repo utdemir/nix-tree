@@ -6,8 +6,8 @@ import Control.Concurrent.Async
 import Control.Exception (evaluate)
 import NixTree.App
 import NixTree.PathStats
-import System.Directory (canonicalizePath, doesDirectoryExist, getHomeDirectory)
-import System.Environment (getArgs)
+import qualified Options.Applicative as Opts
+import System.Directory (doesDirectoryExist, getHomeDirectory)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO (hPutStr, hPutStrLn)
@@ -15,6 +15,27 @@ import System.ProgressBar hiding (msg)
 
 version :: Text
 version = VERSION_nix_tree
+
+data Opts = Opts
+  { oVersion :: Bool,
+    oDerivation :: Bool,
+    oInstallables :: [Installable]
+  }
+
+optsParser :: Opts.ParserInfo Opts
+optsParser =
+  Opts.info (parser <**> Opts.helper) $
+    mconcat
+      [ Opts.progDesc "Interactively browse dependency graphs of Nix derivations.",
+        Opts.fullDesc
+      ]
+  where
+    parser :: Opts.Parser Opts
+    parser =
+      Opts
+        <$> Opts.switch (Opts.long "version" <> Opts.help "Show the nix-tree version.")
+        <*> Opts.switch (Opts.long "derivation" <> Opts.help "Operate on the store derivation rather than its outputs.")
+        <*> many (Opts.strArgument @Text (Opts.metavar "INSTALLABLE" <> Opts.help "A store path or a flake reference.") <&> Installable)
 
 usage :: Text
 usage =
@@ -33,16 +54,13 @@ usageAndFail msg = do
 
 main :: IO ()
 main = do
-  args <- getArgs
-  when (any (`elem` ["-h", "--help"]) args) $ do
-    putText usage
-    exitWith ExitSuccess
+  opts <- Opts.execParser optsParser
 
-  when ("--version" `elem` args) $ do
+  when (opts & oVersion) $ do
     putTextLn $ "nix-tree " <> version
     exitWith ExitSuccess
 
-  paths <- case args of
+  installables <- case opts & oInstallables of
     p : ps ->
       return $ p :| ps
     [] -> do
@@ -55,9 +73,9 @@ main = do
           ]
       case roots of
         [] -> usageAndFail "No store path given."
-        p : ps -> return $ p :| ps
-  storePaths <- mapM canonicalizePath paths
-  ret <- withStoreEnv storePaths $ \env' -> do
+        p : ps -> return . fmap (Installable . toText) $ p :| ps
+
+  withStoreEnv (opts & oDerivation) installables $ \env' -> do
     let env = calculatePathStats env'
         allPaths = seAll env
 
@@ -68,11 +86,6 @@ main = do
       & mapConcurrently_ (mapM_ (\p -> evaluate (rnf p) >> incProgress bar 1))
 
     run env
-
-  case ret of
-    Right () -> return ()
-    Left err ->
-      usageAndFail $ "Not a store path: " <> show err
 
 chunks :: Int -> [a] -> [[a]]
 chunks _ [] = []

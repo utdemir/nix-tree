@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+* feat: Support passing flake references (issue: #27)
+  * Try `nix-tree nixpkgs#hello'
+* change: `nix-tree` now requires an explicit `--derivation` flag to work on store derivation rather than its outputs.
+  * This is to be more consistent `nix path-info`.
+
 ## 0.1.9 - 2021-11-08:
 
 * fix: Automatically enable the required 'nix-command' experimental feature on Nix >= 2.4

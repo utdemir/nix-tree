@@ -5,6 +5,7 @@ module NixTree.StorePath
     storeNameToShortText,
     storeNameToSplitShortText,
     StorePath (..),
+    Installable (..),
     StoreEnv (..),
     withStoreEnv,
     seLookup,
@@ -21,10 +22,9 @@ import Data.Aeson (FromJSON (..), Value (..), decode, (.:))
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import Data.List (partition)
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import System.FilePath.Posix (addTrailingPathSeparator, splitDirectories, (</>))
+import System.IO (hPutStrLn)
 import System.Process.Typed (proc, readProcessStdout_)
 
 -- Technically these both are filepaths. However, most people use the default "/nix/store",
@@ -86,6 +86,42 @@ storeNameToSplitShortText txt =
 
 --------------------------------------------------------------------------------
 
+data NixVersion
+  = NixOlder
+  | Nix2_4
+  | NixNewer
+  | NixUnknown
+  deriving (Show, Eq, Ord)
+
+getNixVersion :: IO NixVersion
+getNixVersion = do
+  out <- decodeUtf8 . BL.toStrict <$> readProcessStdout_ (proc "nix" ["--version"])
+
+  -- Parses strings like:
+  --  nix (Nix) 2.6.0pre20211217_6e6e998
+  --  nix (Nix) 2.5.1
+  return . fromMaybe NixUnknown $ do
+    -- get the last space delimited part
+    ver <-
+      out
+        & T.splitOn " "
+        & viaNonEmpty last
+
+    -- split by ".", take the first two, and convert them to numbers
+    (major, minor) <- do
+      let maT : miT : _ = T.splitOn "." ver
+      ma <- readMaybe @Natural (toString maT)
+      mi <- readMaybe @Natural (toString miT)
+      return (ma, mi)
+
+    -- map it to the sum
+    return $ case compare (major, minor) (2, 4) of
+      LT -> NixOlder
+      EQ -> Nix2_4
+      GT -> NixNewer
+
+--------------------------------------------------------------------------------
+
 data StorePath s ref payload = StorePath
   { spName :: StoreName s,
     spSize :: Int,
@@ -96,45 +132,33 @@ data StorePath s ref payload = StorePath
 
 instance (NFData a, NFData b) => NFData (StorePath s a b)
 
-mkStorePaths :: NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
-mkStorePaths names = do
-  nixStore <- getNixStore
-  -- See: https://github.com/utdemir/nix-tree/issues/12
-  --
-  -- > In Nix < 2.4, when you pass a .drv to path-info, it returns information about the store
-  -- > derivation. However, when you do the same in 2.4, it "resolves" it and works on
-  -- > the output of given derivation; to actually work on the derivation you need to pass
-  -- > --derivation.
-  isAtLeastNix24 <- (>= Just "2.4") <$> getNixVersion
+newtype Installable = Installable {installableToText :: Text}
 
-  let (derivations, outputs) =
-        partition
-          (\i -> ".drv" `T.isSuffixOf` storeNameToText i)
-          (NE.toList names)
-  (++)
-    <$> maybe (return []) (getPathInfo nixStore isAtLeastNix24 False) (NE.nonEmpty outputs)
-    <*> maybe (return []) (getPathInfo nixStore isAtLeastNix24 True) (NE.nonEmpty derivations)
-  where
-    getNixVersion :: IO (Maybe Text)
-    getNixVersion = do
-      out <- decodeUtf8 . BL.toStrict <$> readProcessStdout_ (proc "nix" ["--version"])
-      return . viaNonEmpty last $ T.splitOn " " out
+--------------------------------------------------------------------------------
 
-getPathInfo :: NixStore -> Bool -> Bool -> NonEmpty (StoreName s) -> IO [StorePath s (StoreName s) ()]
-getPathInfo nixStore isAtLeastNix24 isDrv names = do
+data PathInfoOptions = PathInfoOptions
+  { pioIsRecursive :: Bool,
+    pioIsDerivation :: Bool
+  }
+
+getPathInfo :: NixStore -> NixVersion -> PathInfoOptions -> NonEmpty Installable -> IO (NonEmpty (StorePath s (StoreName s) ()))
+getPathInfo nixStore nixVersion options names = do
   infos <-
     decode @[NixPathInfoResult]
       <$> readProcessStdout_
         ( proc
             "nix"
-            ( ["path-info", "--recursive", "--json"]
-                ++ (if isAtLeastNix24 then ["--extra-experimental-features", "nix-command"] else [])
-                ++ (if isDrv && isAtLeastNix24 then ["--derivation"] else [])
-                ++ map storeNameToPath (toList names)
+            ( ["path-info", "--json"]
+                ++ (if options & pioIsRecursive then ["--recursive"] else [])
+                ++ (if (options & pioIsDerivation) && nixVersion >= Nix2_4 then ["--derivation"] else [])
+                ++ (if nixVersion >= Nix2_4 then ["--extra-experimental-features", "nix-command flakes"] else [])
+                ++ map (toString . installableToText) (toList names)
             )
         )
       >>= maybe (fail "Failed parsing nix path-info output.") return
       >>= mapM assertValidInfo
+      >>= maybe (fail "invariant violation: getPathInfo returned []") return . nonEmpty
+
   mapM infoToStorePath infos
   where
     infoToStorePath NixPathInfo {npiPath, npiNarSize, npiReferences} = do
@@ -155,7 +179,7 @@ getPathInfo nixStore isAtLeastNix24 isDrv names = do
 
     assertValidInfo (NixPathInfoValid pathinfo) = return pathinfo
     assertValidInfo (NixPathInfoInvalid path) =
-      fail $ "Invalid path: " ++ path ++ ". Inconsistent NIX_STORE or ongoing GC."
+      fail $ "Invalid path: " ++ path ++ ". Make sure that it is built, or pass '--derivation' if you want to work on the derivation."
 
 --------------------------------------------------------------------------------
 
@@ -168,32 +192,44 @@ data StoreEnv s payload = StoreEnv
 withStoreEnv ::
   forall m a.
   MonadIO m =>
-  NonEmpty FilePath ->
+  Bool ->
+  NonEmpty Installable ->
   (forall s. StoreEnv s () -> m a) ->
-  m (Either [FilePath] a)
-withStoreEnv fnames cb = do
+  m a
+withStoreEnv isDerivation names cb = do
   nixStore <- liftIO getNixStore
 
-  let names' =
-        fnames
-          & toList
-          & map (\f -> maybe (Left f) Right (mkStoreName nixStore f))
-          & partitionEithers
+  -- See: https://github.com/utdemir/nix-tree/issues/12
+  nixVersion <- liftIO getNixVersion
 
-  case names' of
-    (errs@(_ : _), _) -> return (Left errs)
-    ([], xs) -> case nonEmpty xs of
-      Nothing -> error "invariant violation"
-      Just names -> do
-        paths <- liftIO $ mkStorePaths names
-        let env =
-              StoreEnv
-                ( paths
-                    & map (\p@StorePath {spName} -> (spName, p))
-                    & HM.fromList
-                )
-                names
-        Right <$> cb env
+  when (isDerivation && nixVersion < Nix2_4) $
+    liftIO $ hPutStrLn stderr "Warning: --derivation flag is ignored on Nix versions older than 2.4."
+
+  roots <-
+    liftIO $
+      getPathInfo
+        nixStore
+        nixVersion
+        (PathInfoOptions {pioIsDerivation = isDerivation, pioIsRecursive = False})
+        names
+
+  paths <-
+    liftIO $
+      getPathInfo
+        nixStore
+        nixVersion
+        (PathInfoOptions {pioIsDerivation = isDerivation, pioIsRecursive = True})
+        (Installable . toText . storeNameToPath . spName <$> roots)
+
+  let env =
+        StoreEnv
+          ( paths
+              & toList
+              & map (\p@StorePath {spName} -> (spName, p))
+              & HM.fromList
+          )
+          (roots <&> spName)
+  cb env
 
 seLookup :: StoreEnv s a -> StoreName s -> StorePath s (StoreName s) a
 seLookup StoreEnv {sePaths} name =

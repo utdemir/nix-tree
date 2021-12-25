@@ -36,6 +36,7 @@ common common-options
                       RankNTypes
                       ScopedTypeVariables
                       NumericUnderscores
+                      MultiWayIf
   other-modules:      NixTree.PathStats
                       NixTree.StorePath
                       NixTree.App
@@ -60,6 +61,7 @@ common common-options
                     , unordered-containers
                     , vty
                     , directory
+                    , optparse-applicative
 
 executable nix-tree
   import:             common-options
