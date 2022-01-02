@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2022-01-02:
 
 * feat: Support passing flake references (issue: [#27][])
   * Try `nix-tree nixpkgs#hello'
