@@ -5,10 +5,10 @@
         "homepage": "",
         "owner": "numtide",
         "repo": "nix-filter",
-        "rev": "3c9e33ed627e009428197b07216613206f06ed80",
-        "sha256": "19w142crrkywxynmyw4rhz4nglrg64yjawfkw3j91qwkwbfjds84",
+        "rev": "40a58baa248a8b335e2d66ca258a74248af9d834",
+        "sha256": "1rqapavm2mghwrxq989wc7m9fy2d4hc1qw42rz64pgbxx7rphn1z",
         "type": "tarball",
-        "url": "https://github.com/numtide/nix-filter/archive/3c9e33ed627e009428197b07216613206f06ed80.tar.gz",
+        "url": "https://github.com/numtide/nix-filter/archive/40a58baa248a8b335e2d66ca258a74248af9d834.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
@@ -17,10 +17,10 @@
         "homepage": "",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "ab93217a2b74a1c36bc892c14f44ee5959c33f12",
-        "sha256": "132qaxnlp2swvr0pd4xr22ykh9jbi2dlspwbsgldcfra3qkyy1i9",
+        "rev": "f4dfed73ee886b115a99e5b85fdfbeb683290d83",
+        "sha256": "1scpisl06f9mc31khj0m2q21yvx108bi7l9s0n9aq8f1w4fjprg6",
         "type": "tarball",
-        "url": "https://github.com/nixos/nixpkgs/archive/ab93217a2b74a1c36bc892c14f44ee5959c33f12.tar.gz",
+        "url": "https://github.com/nixos/nixpkgs/archive/f4dfed73ee886b115a99e5b85fdfbeb683290d83.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
