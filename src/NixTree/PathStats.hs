@@ -37,8 +37,8 @@ mkIntermediateEnv env =
                 [ (spName, const () <$> sp)
                   | sp@StorePath {spName} <- spRefs curr,
                     env spName
-                ] :
-              map (ipsAllRefs . spPayload) (spRefs curr)
+                ]
+                : map (ipsAllRefs . spPayload) (spRefs curr)
             )
       }
 

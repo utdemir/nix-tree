@@ -195,7 +195,7 @@ app =
           -- main screen
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'q', V.KEsc] ->
-              B.halt s
+                B.halt s
           (B.VtyEvent (V.EvKey (V.KChar '?') []), Nothing) ->
             B.continue s {aeOpenModal = Just (ModalNotice helpNotice)}
           (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) -> do
@@ -217,16 +217,16 @@ app =
                 & sortPanes
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'h', V.KLeft] ->
-              B.continue $ moveLeft s
+                B.continue $ moveLeft s
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'j', V.KDown, V.KChar '\t'] ->
-              B.continue $ move B.listMoveDown s
+                B.continue $ move B.listMoveDown s
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'k', V.KUp, V.KBackTab] ->
-              B.continue $ move B.listMoveUp s
+                B.continue $ move B.listMoveUp s
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'l', V.KRight] ->
-              B.continue $ moveRight s
+                B.continue $ moveRight s
           (B.VtyEvent (V.EvKey V.KPageUp []), Nothing) ->
             B.continue =<< moveF B.listMovePageUp s
           (B.VtyEvent (V.EvKey V.KPageDown []), Nothing) ->
@@ -234,21 +234,21 @@ app =
           -- why-depends modal
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
             | k `elem` [V.KChar 'q', V.KEsc] ->
-              B.continue s {aeOpenModal = Nothing}
+                B.continue s {aeOpenModal = Nothing}
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
             | k `elem` [V.KChar 'h', V.KLeft] -> do
-              B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) (-1)
-              B.continue s
+                B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) (-1)
+                B.continue s
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
             | k `elem` [V.KChar 'j', V.KDown, V.KChar '\t'] ->
-              B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveDown l)}
+                B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveDown l)}
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
             | k `elem` [V.KChar 'k', V.KUp, V.KBackTab] ->
-              B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveUp l)}
+                B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveUp l)}
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
             | k `elem` [V.KChar 'l', V.KRight] -> do
-              B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) 1
-              B.continue s
+                B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) 1
+                B.continue s
           (B.VtyEvent (V.EvKey V.KPageUp []), Just (ModalWhyDepends l)) ->
             B.listMovePageUp l >>= \l' ->
               B.continue s {aeOpenModal = Just $ ModalWhyDepends l'}
@@ -265,10 +265,10 @@ app =
             B.continue s {aeOpenModal = Nothing}
           (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
             | k `elem` [V.KDown, V.KChar '\t'] ->
-              B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveDown xs)}
+                B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveDown xs)}
           (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
             | k `elem` [V.KUp, V.KBackTab] ->
-              B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveUp xs)}
+                B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveUp xs)}
           (B.VtyEvent (V.EvKey V.KLeft []), Just (ModalSearch l r xs)) ->
             B.continue
               s
@@ -283,7 +283,7 @@ app =
                 }
           (B.VtyEvent (V.EvKey (V.KChar c) []), Just (ModalSearch l r _))
             | c `Set.member` allowedSearchChars ->
-              B.continue (showAndUpdateSearch (l <> T.singleton c) r s)
+                B.continue (showAndUpdateSearch (l <> T.singleton c) r s)
           (B.VtyEvent (V.EvKey (V.KBS) []), Just (ModalSearch l r _)) ->
             B.continue (showAndUpdateSearch (T.dropEnd 1 l) r s)
           (B.VtyEvent (V.EvKey V.KEnter []), Just (ModalSearch _ _ xs)) ->
@@ -298,7 +298,7 @@ app =
           -- notices
           (B.VtyEvent (V.EvKey k []), Just (ModalNotice _))
             | k `elem` [V.KChar 'q', V.KEsc] ->
-              B.continue s {aeOpenModal = Nothing}
+                B.continue s {aeOpenModal = Nothing}
           -- handle our events
           (B.AppEvent (EventTick t), _) ->
             let new = s {aeCurrTime = t}
@@ -339,8 +339,8 @@ yankToClipboard p =
           Notice
             "Error"
             ( T.intercalate "\n" $
-                "Cannot copy to clipboard: " :
-                map ("  " <>) errs
+                "Cannot copy to clipboard: "
+                  : map ("  " <>) errs
                   ++ ["Please report this as a bug."]
             )
 
@@ -383,7 +383,9 @@ renderInfoPane env =
             if null immediateParents
               then "Immediate Parents: -"
               else
-                "Immediate Parents (" <> T.pack (show $ length immediateParents) <> "): "
+                "Immediate Parents ("
+                  <> T.pack (show $ length immediateParents)
+                  <> "): "
                   <> T.intercalate ", " (map storeNameToShortText immediateParents)
         ]
   where
@@ -455,9 +457,11 @@ renderSearchModal left right l =
   renderModal "Search" window
   where
     window =
-      B.txt left B.<+> B.txt "|" B.<+> B.txt right
-        B.<=> B.hBorder
-        B.<=> renderList Nothing True l
+      B.txt left
+        B.<+> B.txt "|"
+        B.<+> B.txt right
+          B.<=> B.hBorder
+          B.<=> renderList Nothing True l
 
 showAndUpdateSearch :: Text -> Text -> AppEnv s -> AppEnv s
 showAndUpdateSearch left right env@AppEnv {aeInvertedIndex} =
@@ -491,12 +495,12 @@ moveRight :: AppEnv s -> AppEnv s
 moveRight env@AppEnv {aePrevPane, aeCurrPane, aeNextPane, aeParents}
   | null (B.listElements aeNextPane) = env
   | otherwise =
-    env
-      { aePrevPane = aeCurrPane {B.listName = WidgetPrevPane},
-        aeCurrPane = aeNextPane {B.listName = WidgetCurrPane},
-        aeParents = aePrevPane : aeParents
-      }
-      & repopulateNextPane
+      env
+        { aePrevPane = aeCurrPane {B.listName = WidgetPrevPane},
+          aeCurrPane = aeNextPane {B.listName = WidgetCurrPane},
+          aeParents = aePrevPane : aeParents
+        }
+        & repopulateNextPane
 
 repopulateNextPane :: AppEnv s -> AppEnv s
 repopulateNextPane env@AppEnv {aeActualStoreEnv, aeNextPane, aeSortOrder} =
@@ -547,7 +551,7 @@ selectedPaths AppEnv {aePrevPane, aeCurrPane, aeParents} =
 selectPath :: NonEmpty (Path s) -> AppEnv s -> AppEnv s
 selectPath path env
   | (spName <$> path) == (spName <$> selectedPaths env) =
-    env
+      env
 selectPath path env@AppEnv {aeActualStoreEnv} =
   let root :| children = NE.reverse path
       lists =

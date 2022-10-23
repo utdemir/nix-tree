@@ -203,7 +203,8 @@ withStoreEnv isDerivation names cb = do
   nixVersion <- liftIO getNixVersion
 
   when (isDerivation && nixVersion < Nix2_4) $
-    liftIO $ hPutStrLn stderr "Warning: --derivation flag is ignored on Nix versions older than 2.4."
+    liftIO $
+      hPutStrLn stderr "Warning: --derivation flag is ignored on Nix versions older than 2.4."
 
   roots <-
     liftIO $
@@ -261,11 +262,11 @@ seFetchRefs env predicate =
       | HS.member name visited = (acc, visited)
       | not (predicate name) = (acc, visited)
       | otherwise =
-        let sp@StorePath {spRefs} = seLookup env name
-         in foldl'
-              (\(acc', visited') name' -> go acc' visited' name')
-              (sp : acc, HS.insert name visited)
-              spRefs
+          let sp@StorePath {spRefs} = seLookup env name
+           in foldl'
+                (\(acc', visited') name' -> go acc' visited' name')
+                (sp : acc, HS.insert name visited)
+                spRefs
 
 seBottomUp ::
   forall s a b.
