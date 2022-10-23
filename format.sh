@@ -4,4 +4,4 @@ set -o xtrace
 set -o errexit
 
 fd -e hs -X ormolu -o -XTypeApplications --mode inplace {}
-nixpkgs-fmt default.nix
+nixpkgs-fmt default.nix shell.nix flake.nix
