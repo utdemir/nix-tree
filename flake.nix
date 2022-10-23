@@ -38,6 +38,7 @@
             pkgs.haskellPackages.ormolu
             pkgs.haskellPackages.hlint
             pkgs.nixpkgs-fmt
+            pkgs.bash
           ];
           withHoogle = false;
         };
