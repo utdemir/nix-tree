@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 - 2022-10-24:
+
+* fix: Fix excessive memory use when using why-depends on large dependency graphs (issue: [@31][])
+
+[#25]: https://github.com/utdemir/nix-tree/issues/31
+
 ## 0.2.0 - 2022-01-02:
 
 * feat: Support passing flake references (issue: [#27][])
