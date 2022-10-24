@@ -92,24 +92,6 @@ mkFinalEnv env =
 calculatePathStats :: StoreEnv s () -> StoreEnv s (PathStats s)
 calculatePathStats = mkFinalEnv . mkIntermediateEnv (const True)
 
-whyDepends :: StoreEnv s a -> StoreName s -> [NonEmpty (StorePath s (StoreName s) a)]
-whyDepends env name =
-  seBottomUp
-    ( \curr ->
-        if spName curr == name
-          then [curr {spRefs = map spName (spRefs curr)} :| []]
-          else
-            concat . transpose $
-              map
-                (map (curr {spRefs = map spName (spRefs curr)} NE.<|) . spPayload)
-                (spRefs curr)
-    )
-    env
-    & seGetRoots
-    & fmap spPayload
-    & concat
-    & map NE.reverse
-
 -- TODO: This can be precomputed.
 shortestPathTo :: StoreEnv s a -> StoreName s -> NonEmpty (StorePath s (StoreName s) a)
 shortestPathTo env name =
@@ -135,3 +117,57 @@ shortestPathTo env name =
     & minimumBy (comparing fst)
     & snd
     & NE.reverse
+
+-- Why depends implementation
+
+-- We iterate the dependency graph bottom up. Every node contains a set of paths which represent
+-- the why-depends output from that node down. The set of paths is represented as a "Treeish" object,
+-- which is a trie-like structure.
+whyDepends :: forall s a. StoreEnv s a -> StoreName s -> [NonEmpty (StorePath s (StoreName s) a)]
+whyDepends env name =
+  seBottomUp @_ @_ @(Maybe (Treeish (StorePath s (StoreName s) a)))
+    ( \curr ->
+        if spName curr == name
+          then Just $ mkTreeish (curr {spRefs = map spName (spRefs curr)}) []
+          else
+            spRefs curr
+              & map spPayload
+              & catMaybes
+              & NE.nonEmpty
+              <&> NE.toList
+              <&> mkTreeish (curr {spRefs = map spName (spRefs curr)})
+              <&> capTreeish 1_000_000
+    )
+    env
+    & seGetRoots
+    & fmap spPayload
+    & NE.toList
+    & catMaybes
+    & take 10000
+    & concatMap treeishToList
+
+-- A trie-like structure which also caches the size.
+data Treeish a = Treeish Int a [Treeish a]
+
+mkTreeish :: a -> [Treeish a] -> Treeish a
+mkTreeish a ts = Treeish (1 + sum (map (\(Treeish i _ _) -> i) ts)) a ts
+
+treeishSize :: Treeish a -> Int
+treeishSize (Treeish i _ _) = i
+
+capTreeish :: Int -> Treeish a -> Treeish a
+capTreeish cap (Treeish i a ts)
+  | i <= cap = Treeish i a ts
+  | otherwise = Treeish cap a (go cap ts)
+  where
+    go _ [] = []
+    go remaining (x : xs) =
+      let x' = capTreeish remaining x
+          remaining' = remaining - treeishSize x'
+       in if remaining > 0
+            then x' : go remaining' xs
+            else [x']
+
+treeishToList :: Treeish a -> [NonEmpty a]
+treeishToList (Treeish _ a []) = [a :| []]
+treeishToList (Treeish _ a xs) = map (a NE.<|) (concatMap treeishToList xs)
