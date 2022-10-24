@@ -20,3 +20,4 @@ jobs:
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
     - run: nix build
     - run: nix develop -c echo
+    - run: nix develop -c ./format.sh check
