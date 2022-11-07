@@ -1,0 +1,25 @@
+name: nixpkgs-upstream-tests
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+jobs:
+  nixpkgs-upstream-test:
+    strategy:
+      matrix:
+        os: 
+          - ubuntu-latest
+          - macos-latest
+        branches: 
+          - nixpkgs-unstable
+          - "22.05"
+          - "21.11"
+          - "21.05"
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+    - uses: cachix/install-nix-action@v18
+      with:
+        extra_nix_config: |
+          experimental-features = nix-command flakes   
+    - run: nix run 'nixpkgs/${{matrix.branch}}#nix-tree' -- --help
