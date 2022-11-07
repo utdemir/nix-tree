@@ -25,9 +25,13 @@ jobs:
             ```
             {{ env.GIT_COMMIT_MESSAGE }}
             ```
-      - name: Enable Pull Request Automerge
-        uses: peter-evans/enable-pull-request-automerge@v2
-        with:
-          token: ${{ secrets.PAT }}
-          pull-request-number: ${{ steps.update-flake-lock.outputs.pull-request-number }}
-          merge-method: rebase
+      
+      # TODO: Fine-grained access tokens do not support the GraphQL API necessary for enabling
+      # the automerge: https://github.com/community/community/discussions/36441 
+      #
+      # - name: Enable Pull Request Automerge
+      #   uses: peter-evans/enable-pull-request-automerge@v2
+      #   with:
+      #     token: ${{ secrets.PAT }}
+      #     pull-request-number: ${{ steps.update-flake-lock.outputs.pull-request-number }}
+      #     merge-method: rebase
