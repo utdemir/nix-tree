@@ -16,4 +16,4 @@ shopt -s globstar
 set -o xtrace
 
 ormolu $ormolu_flags {src,test}/**/*.hs
-nixpkgs-fmt  $nixpkgs_fmt_flags default.nix shell.nix flake.nix
+nixpkgs-fmt  $nixpkgs_fmt_flags default.nix flake.nix
