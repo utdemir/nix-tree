@@ -10,7 +10,7 @@ jobs:
         os: 
           - ubuntu-latest
           - macos-latest
-        branches: 
+        branch: 
           - nixpkgs-unstable
           - "22.05"
           - "21.11"
