@@ -6,6 +6,9 @@ on:
 jobs:
   nixpkgs-upstream-test:
     strategy:
+      # Reduce the parallelism as otherwise Nix hits GitHub API limit
+      # when querying for the tag.
+      max-parallel: 1
       matrix:
         os: 
           - ubuntu-latest
