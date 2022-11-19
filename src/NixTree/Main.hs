@@ -39,7 +39,11 @@ optsParser =
           ( Installable
               <$> Opts.strArgument @Text
                 ( Opts.metavar "INSTALLABLE"
-                    <> Opts.help "A store path or a flake reference. Paths default to \"~/.nix-profile\" and \"/var/run/current-system\""
+                    <> Opts.helpDoc
+                      ( Just $
+                          "A store path or a flake reference."
+                            Opts.<$$> "Paths default to \"~/.nix-profile\" and \"/var/run/current-system\""
+                      )
                 )
           )
         <*> Opts.switch (Opts.long "version" <> Opts.help "Show the nix-tree version")
@@ -57,7 +61,10 @@ showAndFail msg = do
 
 main :: IO ()
 main = do
-  opts <- Opts.execParser optsParser
+  opts <-
+    Opts.customExecParser
+      (Opts.prefs $ Opts.columns 120)
+      optsParser
 
   when (opts & oVersion) $ do
     putTextLn $ "nix-tree " <> version
