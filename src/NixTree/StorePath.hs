@@ -7,6 +7,7 @@ module NixTree.StorePath
     StorePath (..),
     Installable (..),
     StoreEnv (..),
+    StoreEnvOptions (..),
     withStoreEnv,
     seLookup,
     seAll,
@@ -138,7 +139,8 @@ newtype Installable = Installable {installableToText :: Text}
 
 data PathInfoOptions = PathInfoOptions
   { pioIsRecursive :: Bool,
-    pioIsDerivation :: Bool
+    pioIsDerivation :: Bool,
+    pioIsImpure :: Bool
   }
 
 getPathInfo :: NixStore -> NixVersion -> PathInfoOptions -> NonEmpty Installable -> IO (NonEmpty (StorePath s (StoreName s) ()))
@@ -149,6 +151,7 @@ getPathInfo nixStore nixVersion options names = do
         ( proc
             "nix"
             ( ["path-info", "--json"]
+                ++ (if options & pioIsImpure then ["--impure"] else [])
                 ++ (if options & pioIsRecursive then ["--recursive"] else [])
                 ++ (if (options & pioIsDerivation) && nixVersion >= Nix2_4 then ["--derivation"] else [])
                 ++ (if nixVersion >= Nix2_4 then ["--extra-experimental-features", "nix-command flakes"] else [])
@@ -189,20 +192,25 @@ data StoreEnv s payload = StoreEnv
   }
   deriving (Functor, Generic, NFData)
 
+data StoreEnvOptions = StoreEnvOptions
+  { seoIsDerivation :: Bool,
+    seoIsImpure :: Bool
+  }
+
 withStoreEnv ::
   forall m a.
   MonadIO m =>
-  Bool ->
+  StoreEnvOptions ->
   NonEmpty Installable ->
   (forall s. StoreEnv s () -> m a) ->
   m a
-withStoreEnv isDerivation names cb = do
+withStoreEnv StoreEnvOptions {seoIsDerivation, seoIsImpure} names cb = do
   nixStore <- liftIO getNixStore
 
   -- See: https://github.com/utdemir/nix-tree/issues/12
   nixVersion <- liftIO getNixVersion
 
-  when (isDerivation && nixVersion < Nix2_4) $
+  when (seoIsDerivation && nixVersion < Nix2_4) $
     liftIO $
       hPutStrLn stderr "Warning: --derivation flag is ignored on Nix versions older than 2.4."
 
@@ -211,7 +219,7 @@ withStoreEnv isDerivation names cb = do
       getPathInfo
         nixStore
         nixVersion
-        (PathInfoOptions {pioIsDerivation = isDerivation, pioIsRecursive = False})
+        (PathInfoOptions {pioIsDerivation = seoIsDerivation, pioIsRecursive = False, pioIsImpure = seoIsImpure})
         names
 
   paths <-
@@ -219,7 +227,7 @@ withStoreEnv isDerivation names cb = do
       getPathInfo
         nixStore
         nixVersion
-        (PathInfoOptions {pioIsDerivation = isDerivation, pioIsRecursive = True})
+        (PathInfoOptions {pioIsDerivation = seoIsDerivation, pioIsRecursive = True, pioIsImpure = seoIsImpure})
         (Installable . toText . storeNameToPath . spName <$> roots)
 
   let env =

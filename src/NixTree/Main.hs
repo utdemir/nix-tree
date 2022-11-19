@@ -20,7 +20,8 @@ version = VERSION_nix_tree
 data Opts = Opts
   { oInstallables :: [Installable],
     oVersion :: Bool,
-    oDerivation :: Bool
+    oDerivation :: Bool,
+    oImpure :: Bool
   }
 
 optsParser :: Opts.ParserInfo Opts
@@ -48,6 +49,7 @@ optsParser =
           )
         <*> Opts.switch (Opts.long "version" <> Opts.help "Show the nix-tree version")
         <*> Opts.switch (Opts.long "derivation" <> Opts.help "Operate on the store derivation rather than its outputs")
+        <*> Opts.switch (Opts.long "impure" <> Opts.help "Allow access to mutable paths and repositories")
 
     keybindingsHelp :: Opts.Doc
     keybindingsHelp =
@@ -85,7 +87,13 @@ main = do
         [] -> showAndFail "No store path given."
         p : ps -> return . fmap (Installable . toText) $ p :| ps
 
-  withStoreEnv (opts & oDerivation) installables $ \env' -> do
+  let seo =
+        StoreEnvOptions
+          { seoIsDerivation = opts & oDerivation,
+            seoIsImpure = opts & oImpure
+          }
+
+  withStoreEnv seo installables $ \env' -> do
     let env = calculatePathStats env'
         allPaths = seAll env
 
