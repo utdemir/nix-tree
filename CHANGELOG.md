@@ -3,14 +3,16 @@
 ## Unreleased
 
 * feat: Improved help text.
-* feat: Allow passing '--impure' flag to Nix (issue: [@40][]) 
+* feat: Allow passing '--impure' flag to Nix (issue: [#40][]) 
 * fix: Use -O1 instead of -O2 to save on compile times.
+
+[#40]: https://github.com/utdemir/nix-tree/issues/40
 
 ## 0.2.1 - 2022-10-24:
 
-* fix: Fix excessive memory use when using why-depends on large dependency graphs (issue: [@31][])
+* fix: Fix excessive memory use when using why-depends on large dependency graphs (issue: [#31][])
 
-[#25]: https://github.com/utdemir/nix-tree/issues/31
+[#31]: https://github.com/utdemir/nix-tree/issues/31
 
 ## 0.2.0 - 2022-01-02:
 
