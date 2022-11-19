@@ -407,12 +407,12 @@ helpText =
   T.intercalate
     "\n"
     [ "hjkl/Arrow Keys : Navigate",
-      "w               : Open why-depends mode",
-      "/               : Open search mode",
+      "w               : Open why-depends modal",
+      "/               : Open search modal",
       "s               : Change sort order",
       "y               : Yank selected path to clipboard",
       "?               : Show help",
-      "q/Esc:          : Quit / close modal"
+      "q/Esc           : Quit / close modal"
     ]
 
 helpNotice :: Notice

@@ -7,19 +7,20 @@ import Control.Exception (evaluate)
 import NixTree.App
 import NixTree.PathStats
 import qualified Options.Applicative as Opts
+import qualified Options.Applicative.Help.Pretty as Opts
 import System.Directory (doesDirectoryExist, getHomeDirectory)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
-import System.IO (hPutStr, hPutStrLn)
+import System.IO (hPutStrLn)
 import System.ProgressBar hiding (msg)
 
 version :: Text
 version = VERSION_nix_tree
 
 data Opts = Opts
-  { oVersion :: Bool,
-    oDerivation :: Bool,
-    oInstallables :: [Installable]
+  { oInstallables :: [Installable],
+    oVersion :: Bool,
+    oDerivation :: Bool
   }
 
 optsParser :: Opts.ParserInfo Opts
@@ -27,29 +28,31 @@ optsParser =
   Opts.info (parser <**> Opts.helper) $
     mconcat
       [ Opts.progDesc "Interactively browse dependency graphs of Nix derivations.",
-        Opts.fullDesc
+        Opts.fullDesc,
+        Opts.footerDoc (Just keybindingsHelp)
       ]
   where
     parser :: Opts.Parser Opts
     parser =
       Opts
-        <$> Opts.switch (Opts.long "version" <> Opts.help "Show the nix-tree version.")
-        <*> Opts.switch (Opts.long "derivation" <> Opts.help "Operate on the store derivation rather than its outputs.")
-        <*> many (Opts.strArgument @Text (Opts.metavar "INSTALLABLE" <> Opts.help "A store path or a flake reference.") <&> Installable)
+        <$> many
+          ( Installable
+              <$> Opts.strArgument @Text
+                ( Opts.metavar "INSTALLABLE"
+                    <> Opts.help "A store path or a flake reference. Paths default to \"~/.nix-profile\" and \"/var/run/current-system\""
+                )
+          )
+        <*> Opts.switch (Opts.long "version" <> Opts.help "Show the nix-tree version")
+        <*> Opts.switch (Opts.long "derivation" <> Opts.help "Operate on the store derivation rather than its outputs")
 
-usage :: Text
-usage =
-  unlines
-    [ "Usage: nix-tree [paths...] [-h|--help] [--version]",
-      "  Paths default to $HOME/.nix-profile and /var/run/current-system.",
-      "Keybindings:",
-      unlines . map ("  " <>) . lines $ helpText
-    ]
+    keybindingsHelp :: Opts.Doc
+    keybindingsHelp =
+      "Keybindings:"
+        Opts.<$$> (Opts.indent 2 . Opts.vsep $ map (Opts.text . toString) (lines helpText))
 
-usageAndFail :: Text -> IO a
-usageAndFail msg = do
+showAndFail :: Text -> IO a
+showAndFail msg = do
   hPutStrLn stderr . toString $ "Error: " <> msg
-  hPutStr stderr $ toString usage
   exitWith (ExitFailure 1)
 
 main :: IO ()
@@ -72,7 +75,7 @@ main = do
             "/var/run/current-system"
           ]
       case roots of
-        [] -> usageAndFail "No store path given."
+        [] -> showAndFail "No store path given."
         p : ps -> return . fmap (Installable . toText) $ p :| ps
 
   withStoreEnv (opts & oDerivation) installables $ \env' -> do

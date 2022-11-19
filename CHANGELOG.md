@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* feat: Improved help text.
+
 ## 0.2.1 - 2022-10-24:
 
 * fix: Fix excessive memory use when using why-depends on large dependency graphs (issue: [@31][])
