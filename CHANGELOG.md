@@ -3,6 +3,7 @@
 ## Unreleased
 
 * feat: Improved help text.
+* fix: Use -O1 instead of -O2 to save on compile times.
 
 ## 0.2.1 - 2022-10-24:
 

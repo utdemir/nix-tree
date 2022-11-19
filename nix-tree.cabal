@@ -65,7 +65,7 @@ common common-options
 
 executable nix-tree
   import:             common-options
-  ghc-options:        -Wunused-packages -O2 -threaded -with-rtsopts=-N
+  ghc-options:        -Wunused-packages -O1 -threaded -with-rtsopts=-N
   main-is:            NixTree/Main.hs
   hs-source-dirs:     src
   default-language:   Haskell2010
