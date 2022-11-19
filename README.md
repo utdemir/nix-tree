@@ -31,8 +31,17 @@ nix run github:utdemir/nix-tree
 
 ```
 $ nix-tree --help
-Usage: nix-tree [paths...] [-h|--help] [--version]
-  Paths default to $HOME/.nix-profile and /var/run/current-system.
+Usage: nix-tree [--version] [--derivation] [INSTALLABLE]
+  Interactively browse dependency graphs of Nix derivations.
+
+Available options:
+  --version                Show the nix-tree version.
+  --derivation             Operate on the store derivation rather than its
+                           outputs.
+  INSTALLABLE              A store path or a flake reference. Paths default to
+                           "~/.nix-profile" and "/var/run/current-system".
+  -h,--help                Show this help text
+
 Keybindings:
   hjkl/Arrow Keys : Navigate
   w               : Open why-depends mode
@@ -40,7 +49,7 @@ Keybindings:
   s               : Change sort order
   y               : Yank selected path to clipboard
   ?               : Show help
-  q/Esc:          : Quit / close modal
+  q/Esc           : Quit / close modal
 ```
 
 ### Glossary
