@@ -18,7 +18,7 @@ nix-env -i nix-tree
 To run the current development version:
 
 ```
-nix run github:utdemir/nix-tree
+nix run github:utdemir/nix-tree -- --help
 ```
 
 ## Usage
@@ -66,13 +66,23 @@ with `| xargs -o nix-tree`. Examples:
 nix-build . --no-out-link | xargs -o nix-tree
 
 # Build time dependencies (passing a `.drv` path)
-nix-instantiate --no-out-link | xargs -o nix-tree
+nix-instantiate -r | xargs -o nix-tree --derivation
 
 # Dependencies from shell.nix
 nix-build shell.nix -A inputDerivation | xargs -o nix-tree
 
 # All outputs of a derivation in nixpkgs:
 nix-build '<nixpkgs>' -A openssl.all --no-out-link | xargs -o nix-tree
+```
+
+`nix-tree` also supports flake references:
+
+```bash
+# Build time dependencies of a flake on the current directory
+nix-tree --derivation '.#'
+
+# Same thing works for any flake reference
+nix-tree --derivation 'nixpkgs#asciiquarium'
 ```
 
 ## Contributing
