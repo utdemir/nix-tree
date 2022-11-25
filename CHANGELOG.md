@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2022-11-26:
 
 * feat: Improved help text.
 * feat: Allow passing '--impure' flag to Nix (issue: [#40][]) 
