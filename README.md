@@ -15,7 +15,7 @@ Interactively browse dependency graphs of Nix derivations.
 nix-env -i nix-tree
 ```
 
-To run the current development version (you might need to pass `--experimental-options flakes`):
+To run the current development version:
 
 ```
 nix run github:utdemir/nix-tree
