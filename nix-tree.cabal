@@ -37,6 +37,7 @@ common common-options
                       ScopedTypeVariables
                       NumericUnderscores
                       MultiWayIf
+                      TemplateHaskell
   other-modules:      NixTree.PathStats
                       NixTree.StorePath
                       NixTree.App
@@ -47,21 +48,19 @@ common common-options
   build-depends:      base
                     , relude
                     , aeson
-                    , brick >= 0.64
+                    , brick >= 1 && < 2
                     , bytestring
                     , containers
                     , clock
-                    , deepseq
                     , filepath
-                    , hashable
                     , hrfsize
                     , text
-                    , transformers
                     , typed-process
                     , unordered-containers
                     , vty
                     , directory
                     , optparse-applicative
+                    , microlens
 
 executable nix-tree
   import:             common-options

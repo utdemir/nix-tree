@@ -13,6 +13,7 @@ import qualified Data.Sequence as S
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Graphics.Vty as V
+import Lens.Micro (Traversal', _Just)
 import qualified NixTree.Clipboard as Clipboard
 import NixTree.PathStats
 import qualified System.Clock as Clock
@@ -68,14 +69,21 @@ data SortOrder
   | SortOrderAddedSize
   deriving (Show, Eq, Enum, Bounded)
 
+B.suffixLenses ''AppEnv
+
+_ModalWhyDepends :: Traversal' (Modal s) (B.GenericList Widgets Seq (NonEmpty (Path s)))
+_ModalWhyDepends f m = case m of
+  ModalWhyDepends l -> ModalWhyDepends <$> f l
+  _ -> pure m
+
 compareBySortOrder :: SortOrder -> Path s -> Path s -> Ordering
 compareBySortOrder SortOrderAlphabetical = compare `on` T.toLower . storeNameToShortText . spName
 compareBySortOrder SortOrderClosureSize = compare `on` Down . psTotalSize . spPayload
 compareBySortOrder SortOrderAddedSize = compare `on` Down . psAddedSize . spPayload
 
 attrTerminal, attrUnderlined :: B.AttrName
-attrTerminal = "terminal"
-attrUnderlined = "underlined"
+attrTerminal = B.attrName "terminal"
+attrUnderlined = B.attrName "underlined"
 
 run :: StoreEnv s (PathStats s) -> IO ()
 run env = do
@@ -190,26 +198,27 @@ app =
           renderMainScreen env
         ],
       B.appChooseCursor = \_ -> const Nothing,
-      B.appHandleEvent = \s e ->
+      B.appHandleEvent = \e -> do
+        s <- get
         case (e, aeOpenModal s) of
           -- main screen
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'q', V.KEsc] ->
-                B.halt s
+                B.halt
           (B.VtyEvent (V.EvKey (V.KChar '?') []), Nothing) ->
-            B.continue s {aeOpenModal = Just (ModalNotice helpNotice)}
+            put s {aeOpenModal = Just (ModalNotice helpNotice)}
           (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) -> do
             B.hScrollToBeginning (B.viewportScroll WidgetWhyDependsViewport)
-            B.continue $ showWhyDepends s
+            modify showWhyDepends
           (B.VtyEvent (V.EvKey (V.KChar '/') []), Nothing) ->
-            B.continue $ showAndUpdateSearch "" "" s
+            modify $ showAndUpdateSearch "" ""
           (B.VtyEvent (V.EvKey (V.KChar 'y') []), Nothing) -> do
             liftIO (yankToClipboard $ spName (selectedPath s))
               >>= \case
-                Right () -> B.continue s
-                Left n -> B.continue s {aeOpenModal = Just (ModalNotice n)}
+                Right () -> return ()
+                Left n -> put s {aeOpenModal = Just (ModalNotice n)}
           (B.VtyEvent (V.EvKey (V.KChar 's') []), Nothing) ->
-            B.continue $
+            put $
               s
                 { aeSortOrder = succCycle (aeSortOrder s),
                   aeSortOrderLastChanged = aeCurrTime s
@@ -217,98 +226,93 @@ app =
                 & sortPanes
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'h', V.KLeft] ->
-                B.continue $ moveLeft s
+                modify moveLeft
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'j', V.KDown, V.KChar '\t'] ->
-                B.continue $ move B.listMoveDown s
+                move B.listMoveDown
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'k', V.KUp, V.KBackTab] ->
-                B.continue $ move B.listMoveUp s
+                move B.listMoveUp
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'l', V.KRight] ->
-                B.continue $ moveRight s
+                modify moveRight
           (B.VtyEvent (V.EvKey V.KPageUp []), Nothing) ->
-            B.continue =<< moveF B.listMovePageUp s
+            moveF B.listMovePageUp
           (B.VtyEvent (V.EvKey V.KPageDown []), Nothing) ->
-            B.continue =<< moveF B.listMovePageDown s
+            moveF B.listMovePageDown
           -- why-depends modal
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
             | k `elem` [V.KChar 'q', V.KEsc] ->
-                B.continue s {aeOpenModal = Nothing}
+                put s {aeOpenModal = Nothing}
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
-            | k `elem` [V.KChar 'h', V.KLeft] -> do
+            | k `elem` [V.KChar 'h', V.KLeft] ->
                 B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) (-1)
-                B.continue s
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
             | k `elem` [V.KChar 'j', V.KDown, V.KChar '\t'] ->
-                B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveDown l)}
+                put s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveDown l)}
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
             | k `elem` [V.KChar 'k', V.KUp, V.KBackTab] ->
-                B.continue s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveUp l)}
+                put s {aeOpenModal = Just $ ModalWhyDepends (B.listMoveUp l)}
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
-            | k `elem` [V.KChar 'l', V.KRight] -> do
+            | k `elem` [V.KChar 'l', V.KRight] ->
                 B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) 1
-                B.continue s
-          (B.VtyEvent (V.EvKey V.KPageUp []), Just (ModalWhyDepends l)) ->
-            B.listMovePageUp l >>= \l' ->
-              B.continue s {aeOpenModal = Just $ ModalWhyDepends l'}
-          (B.VtyEvent (V.EvKey V.KPageDown []), Just (ModalWhyDepends l)) ->
-            B.listMovePageDown l >>= \l' ->
-              B.continue s {aeOpenModal = Just $ ModalWhyDepends l'}
+          (B.VtyEvent (V.EvKey V.KPageUp []), Just (ModalWhyDepends _)) ->
+            B.zoom (aeOpenModalL . _Just . _ModalWhyDepends) B.listMovePageUp
+          (B.VtyEvent (V.EvKey V.KPageDown []), Just (ModalWhyDepends _)) ->
+            B.zoom (aeOpenModalL . _Just . _ModalWhyDepends) B.listMovePageDown
           (B.VtyEvent (V.EvKey V.KEnter []), Just (ModalWhyDepends l)) ->
             let closed = s {aeOpenModal = Nothing}
              in case B.listSelectedElement l of
-                  Nothing -> B.continue closed
-                  Just (_, path) -> B.continue $ selectPath path closed
+                  Nothing -> put closed
+                  Just (_, path) -> put $ selectPath path closed
           -- search modal
           (B.VtyEvent (V.EvKey V.KEsc []), Just (ModalSearch _ _ _)) ->
-            B.continue s {aeOpenModal = Nothing}
+            put s {aeOpenModal = Nothing}
           (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
             | k `elem` [V.KDown, V.KChar '\t'] ->
-                B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveDown xs)}
+                put s {aeOpenModal = Just $ ModalSearch l r (B.listMoveDown xs)}
           (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
             | k `elem` [V.KUp, V.KBackTab] ->
-                B.continue s {aeOpenModal = Just $ ModalSearch l r (B.listMoveUp xs)}
+                put s {aeOpenModal = Just $ ModalSearch l r (B.listMoveUp xs)}
           (B.VtyEvent (V.EvKey V.KLeft []), Just (ModalSearch l r xs)) ->
-            B.continue
-              s
-                { aeOpenModal =
+            put
+              s { aeOpenModal =
                     Just $ ModalSearch (T.dropEnd 1 l) (T.takeEnd 1 l <> r) (B.listMoveUp xs)
                 }
           (B.VtyEvent (V.EvKey V.KRight []), Just (ModalSearch l r xs)) ->
-            B.continue
-              s
-                { aeOpenModal =
+            put
+              s { aeOpenModal =
                     Just $ ModalSearch (l <> T.take 1 r) (T.drop 1 r) (B.listMoveUp xs)
                 }
           (B.VtyEvent (V.EvKey (V.KChar c) []), Just (ModalSearch l r _))
             | c `Set.member` allowedSearchChars ->
-                B.continue (showAndUpdateSearch (l <> T.singleton c) r s)
+                modify (showAndUpdateSearch (l <> T.singleton c) r)
           (B.VtyEvent (V.EvKey (V.KBS) []), Just (ModalSearch l r _)) ->
-            B.continue (showAndUpdateSearch (T.dropEnd 1 l) r s)
+            modify (showAndUpdateSearch (T.dropEnd 1 l) r)
           (B.VtyEvent (V.EvKey V.KEnter []), Just (ModalSearch _ _ xs)) ->
             let closed = s {aeOpenModal = Nothing}
              in case B.listSelectedElement xs of
-                  Nothing -> B.continue closed
+                  Nothing -> put closed
                   Just (_, path) ->
-                    B.continue $
+                    put $
                       selectPath
                         (shortestPathTo (aeActualStoreEnv s) (spName path))
                         closed
           -- notices
           (B.VtyEvent (V.EvKey k []), Just (ModalNotice _))
             | k `elem` [V.KChar 'q', V.KEsc] ->
-                B.continue s {aeOpenModal = Nothing}
+                put s {aeOpenModal = Nothing}
           -- handle our events
           (B.AppEvent (EventTick t), _) ->
-            let new = s {aeCurrTime = t}
-             in if timePassedSinceSortOrderChange new <= sum (replicate 2 sortOrderChangeHighlightPeriod)
-                  then B.continue new
-                  else B.continueWithoutRedraw new
+            let new = s {aeCurrTime = t} in do
+            put new
+            if timePassedSinceSortOrderChange new <= sum (replicate 2 sortOrderChangeHighlightPeriod)
+              then return ()
+              else B.continueWithoutRedraw
           -- ignore otherwise
           _ ->
-            B.continue s,
-      B.appStartEvent = \s -> return s,
+            return (),
+      B.appStartEvent = return (),
       B.appAttrMap = \_ ->
         B.attrMap
           V.defAttr
@@ -474,12 +478,13 @@ showAndUpdateSearch left right env@AppEnv {aeInvertedIndex} =
               & S.fromList
        in B.list WidgetSearch xs 1
 
-move :: (List s -> List s) -> AppEnv s -> AppEnv s
-move f = runIdentity . moveF (Identity . f)
+move :: (List s -> List s) -> B.EventM n (AppEnv s) ()
+move = moveF . modify
 
-moveF :: Applicative f => (List s -> f (List s)) -> AppEnv s -> f (AppEnv s)
-moveF f env@AppEnv {aeCurrPane} =
-  repopulateNextPane . (\p -> env {aeCurrPane = p}) <$> f aeCurrPane
+moveF :: B.EventM n (List s) () -> B.EventM n (AppEnv s) ()
+moveF f = do
+  B.zoom aeCurrPaneL f
+  modify repopulateNextPane
 
 moveLeft :: AppEnv s -> AppEnv s
 moveLeft env@AppEnv {aeParents = []} = env
