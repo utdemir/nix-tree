@@ -276,12 +276,14 @@ app =
                 put s {aeOpenModal = Just $ ModalSearch l r (B.listMoveUp xs)}
           (B.VtyEvent (V.EvKey V.KLeft []), Just (ModalSearch l r xs)) ->
             put
-              s { aeOpenModal =
+              s
+                { aeOpenModal =
                     Just $ ModalSearch (T.dropEnd 1 l) (T.takeEnd 1 l <> r) (B.listMoveUp xs)
                 }
           (B.VtyEvent (V.EvKey V.KRight []), Just (ModalSearch l r xs)) ->
             put
-              s { aeOpenModal =
+              s
+                { aeOpenModal =
                     Just $ ModalSearch (l <> T.take 1 r) (T.drop 1 r) (B.listMoveUp xs)
                 }
           (B.VtyEvent (V.EvKey (V.KChar c) []), Just (ModalSearch l r _))
@@ -304,11 +306,12 @@ app =
                 put s {aeOpenModal = Nothing}
           -- handle our events
           (B.AppEvent (EventTick t), _) ->
-            let new = s {aeCurrTime = t} in do
-            put new
-            if timePassedSinceSortOrderChange new <= sum (replicate 2 sortOrderChangeHighlightPeriod)
-              then return ()
-              else B.continueWithoutRedraw
+            let new = s {aeCurrTime = t}
+             in do
+                  put new
+                  if timePassedSinceSortOrderChange new <= sum (replicate 2 sortOrderChangeHighlightPeriod)
+                    then return ()
+                    else B.continueWithoutRedraw
           -- ignore otherwise
           _ ->
             return (),
