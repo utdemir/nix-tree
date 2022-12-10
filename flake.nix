@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/haskell-updates";
+    nixpkgs.url = "github:nixos/nixpkgs/haskell-updates"; # FIXME: Use nixpkgs-unstable when this branch lands (See PR: 47)
     flake-utils.url = "github:numtide/flake-utils/master";
     flake-compat = {
       url = "github:edolstra/flake-compat/master";
