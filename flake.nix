@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/haskell-updates"; # FIXME: Use nixpkgs-unstable when this branch lands (See PR: 47)
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils/master";
     flake-compat = {
       url = "github:edolstra/flake-compat/master";
@@ -16,6 +16,12 @@
         haskellPackages = su.haskellPackages.override {
           overrides = hse: _hsu: {
             "nix-tree" = hse.callCabal2nix "nix-tree" self { };
+
+            # Update brick until https://github.com/NixOS/nixpkgs/pull/202022/ is merged
+            "brick" = hse.brick_1_4;
+            "bimap" = hse.bimap_0_5_0;
+            "text-zipper" = hse.text-zipper_0_12;
+            "vty" = hse.vty_5_37;
           };
         };
         nix-tree =
