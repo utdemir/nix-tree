@@ -34,7 +34,7 @@ data Widgets
   | WidgetWhyDependsViewport
   deriving (Show, Eq, Ord)
 
-data Notice = Notice Text Text
+data Notice = Notice { noticeTitle :: Text, _noticeBody :: Text }
 
 data Modal s
   = ModalNotice Notice
@@ -56,6 +56,7 @@ data AppEnv s = AppEnv
     aeOpenModal :: Maybe (Modal s),
     aeSortOrder :: SortOrder,
     aeSortOrderLastChanged :: Clock.TimeSpec,
+    aeLastYanked :: Clock.TimeSpec,
     aeCurrTime :: Clock.TimeSpec
   }
 
@@ -81,9 +82,11 @@ compareBySortOrder SortOrderAlphabetical = compare `on` T.toLower . storeNameToS
 compareBySortOrder SortOrderClosureSize = compare `on` Down . psTotalSize . spPayload
 compareBySortOrder SortOrderAddedSize = compare `on` Down . psAddedSize . spPayload
 
-attrTerminal, attrUnderlined :: B.AttrName
+attrTerminal, attrUnderlined, attrMenuFocused, attrMenuUnfocused :: B.AttrName
 attrTerminal = B.attrName "terminal"
 attrUnderlined = B.attrName "underlined"
+attrMenuFocused = B.attrName "menu-focused"
+attrMenuUnfocused = B.attrName "menu-unfocused"
 
 run :: StoreEnv s (PathStats s) -> IO ()
 run env = do
@@ -118,6 +121,8 @@ run env = do
             aeSortOrder =
               defaultSortOrder,
             aeSortOrderLastChanged =
+              Clock.TimeSpec 0 0,
+            aeLastYanked =
               Clock.TimeSpec 0 0,
             aeCurrTime =
               currTime
@@ -213,10 +218,14 @@ app =
           (B.VtyEvent (V.EvKey (V.KChar '/') []), Nothing) ->
             modify $ showAndUpdateSearch "" ""
           (B.VtyEvent (V.EvKey (V.KChar 'y') []), Nothing) -> do
-            liftIO (yankToClipboard $ spName (selectedPath s))
-              >>= \case
-                Right () -> return ()
-                Left n -> put s {aeOpenModal = Just (ModalNotice n)}
+            res <- liftIO (yankToClipboard $ spName (selectedPath s))
+            let modal = case res of
+                  Right () -> Nothing
+                  Left n -> Just (ModalNotice n)
+            put s {
+              aeOpenModal = modal,
+              aeLastYanked = aeCurrTime s
+            }
           (B.VtyEvent (V.EvKey (V.KChar 's') []), Nothing) ->
             put $
               s
@@ -321,7 +330,9 @@ app =
           V.defAttr
           [ (B.listSelectedFocusedAttr, V.currentAttr `V.withStyle` V.reverseVideo),
             (attrTerminal, B.fg V.blue),
-            (attrUnderlined, V.currentAttr `V.withStyle` V.underline)
+            (attrUnderlined, V.currentAttr `V.withStyle` V.underline),
+            (attrMenuUnfocused, B.bg V.blue),
+            (attrMenuFocused, B.bg V.blue `V.withStyle` V.reverseVideo)
           ]
     }
   where
@@ -360,17 +371,23 @@ renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
     ( B.hBox
         [ renderList Nothing True aePrevPane,
           B.vBorder,
-          renderList shouldHighlightSortOrder True aeCurrPane,
+          renderList (shouldHighlightSortOrder env) True aeCurrPane,
           B.vBorder,
           renderList Nothing False aeNextPane
         ]
     )
     B.<=> renderInfoPane env
-  where
-    shouldHighlightSortOrder =
-      if timePassedSinceSortOrderChange env < sortOrderChangeHighlightPeriod
-        then Just (aeSortOrder env)
-        else Nothing
+    B.<=> renderMenuPane env
+
+shouldHighlightSortOrder :: AppEnv s -> Maybe SortOrder
+shouldHighlightSortOrder env =
+  if timePassedSinceSortOrderChange env < sortOrderChangeHighlightPeriod
+    then Just (aeSortOrder env)
+    else Nothing
+
+shouldHighlightYank :: AppEnv s -> Bool
+shouldHighlightYank env =
+  Clock.diffTimeSpec (aeCurrTime env) (aeLastYanked env) < sortOrderChangeHighlightPeriod
 
 renderInfoPane :: AppEnv s -> B.Widget Widgets
 renderInfoPane env =
@@ -400,6 +417,40 @@ renderInfoPane env =
       if so == aeSortOrder env
         then B.withAttr attrUnderlined
         else identity
+
+renderMenuPane :: forall s. AppEnv s -> B.Widget Widgets
+renderMenuPane env =
+  let items = 
+        [ ( \e -> case aeOpenModal e of Just (ModalNotice n) -> noticeTitle n == (noticeTitle helpNotice); _ -> False
+          , "help [?]"
+          )
+        , ( \e -> case aeOpenModal e of Just (ModalSearch _ _ _) -> True; _ -> False
+          , "search [/]"
+          )
+        , ( \e -> case aeOpenModal e of Just (ModalWhyDepends _) -> True; _ -> False
+          , "why-depends [w]"
+          )
+        , ( \e -> shouldHighlightSortOrder e /= Nothing
+          , "change sort order [s]"
+          )
+        , ( shouldHighlightYank
+          , "yank [y]"
+          )
+        , ( const False
+          , "quit [q]"
+          )
+        ]
+      widgets = 
+          [ B.txt label
+              & bool 
+                  (B.withAttr attrMenuUnfocused)
+                  (B.withAttr attrMenuFocused)
+                  (predicate env) 
+          | (predicate, label) <- items
+          ]
+  in  widgets
+        & intersperse (B.txt " ")
+        & B.hBox
 
 renderModal :: Text -> B.Widget a -> B.Widget a
 renderModal title widget =
