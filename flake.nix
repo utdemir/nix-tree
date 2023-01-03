@@ -16,12 +16,6 @@
         haskellPackages = su.haskellPackages.override {
           overrides = hse: _hsu: {
             "nix-tree" = hse.callCabal2nix "nix-tree" self { };
-
-            # Update brick until https://github.com/NixOS/nixpkgs/pull/202022/ is merged
-            "brick" = hse.brick_1_4;
-            "bimap" = hse.bimap_0_5_0;
-            "text-zipper" = hse.text-zipper_0_12;
-            "vty" = hse.vty_5_37;
           };
         };
         nix-tree =
