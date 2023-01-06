@@ -455,7 +455,7 @@ renderMenuPane env =
 renderModal :: Text -> B.Widget a -> B.Widget a
 renderModal title widget =
   widget
-    & B.borderWithLabel (B.txt title)
+    & B.borderWithLabel (B.withAttr attrMenuUnfocused $ B.txt title)
     & B.hLimitPercent 90
     & B.vLimitPercent 60
     & B.centerLayer
