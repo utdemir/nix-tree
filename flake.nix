@@ -42,6 +42,11 @@
           ];
           withHoogle = false;
         };
+        devShells.cabal = pkgs.mkShell {
+          buildInputs = [
+            pkgs.ghc
+          ];
+        };
       }
     );
 }
