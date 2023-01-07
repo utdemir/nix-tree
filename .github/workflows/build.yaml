@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
 jobs:
-  build:
+  build-nix:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -21,3 +21,20 @@ jobs:
     - run: nix build
     - run: nix develop -c echo
     - run: nix develop -c ./format.sh check
+  build-cabal:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v3
+    - uses: cachix/install-nix-action@v18
+      with:
+        extra_nix_config: |
+          experimental-features = nix-command flakes  
+    - uses: cachix/cachix-action@v12
+      with:
+        name: utdemir
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+    - run: nix develop '.#cabal' -c cabal update 
+    - run: nix develop '.#cabal' -c cabal run -- nix-tree --help
