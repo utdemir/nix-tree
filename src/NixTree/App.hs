@@ -19,8 +19,8 @@ import NixTree.PathStats
 import qualified System.Clock as Clock
 import qualified System.HrfSize as HRF
 
-sortOrderChangeHighlightPeriod :: Clock.TimeSpec
-sortOrderChangeHighlightPeriod = Clock.TimeSpec 0 (500 * 1_000_000)
+changeHighlightPeriod :: Clock.TimeSpec
+changeHighlightPeriod = Clock.TimeSpec 0 (500 * 1_000_000)
 
 data Event
   = EventTick Clock.TimeSpec
@@ -34,7 +34,7 @@ data Widgets
   | WidgetWhyDependsViewport
   deriving (Show, Eq, Ord)
 
-data Notice = Notice { noticeTitle :: Text, _noticeBody :: Text }
+data Notice = Notice {noticeTitle :: Text, _noticeBody :: Text}
 
 data Modal s
   = ModalNotice Notice
@@ -222,10 +222,11 @@ app =
             let modal = case res of
                   Right () -> Nothing
                   Left n -> Just (ModalNotice n)
-            put s {
-              aeOpenModal = modal,
-              aeLastYanked = aeCurrTime s
-            }
+            put
+              s
+                { aeOpenModal = modal,
+                  aeLastYanked = aeCurrTime s
+                }
           (B.VtyEvent (V.EvKey (V.KChar 's') []), Nothing) ->
             put $
               s
@@ -318,7 +319,9 @@ app =
             let new = s {aeCurrTime = t}
              in do
                   put new
-                  if timePassedSinceSortOrderChange new <= sum (replicate 2 sortOrderChangeHighlightPeriod)
+
+                  let lastChange = max (aeSortOrderLastChanged new) (aeLastYanked new)
+                  if Clock.diffTimeSpec t lastChange < sum (replicate 2 changeHighlightPeriod)
                     then return ()
                     else B.continueWithoutRedraw
           -- ignore otherwise
@@ -362,9 +365,6 @@ yankToClipboard p =
                   ++ ["Please report this as a bug."]
             )
 
-timePassedSinceSortOrderChange :: AppEnv s -> Clock.TimeSpec
-timePassedSinceSortOrderChange env = Clock.diffTimeSpec (aeCurrTime env) (aeSortOrderLastChanged env)
-
 renderMainScreen :: AppEnv s -> B.Widget Widgets
 renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
   (B.joinBorders . B.border)
@@ -381,13 +381,13 @@ renderMainScreen env@AppEnv {aePrevPane, aeCurrPane, aeNextPane} =
 
 shouldHighlightSortOrder :: AppEnv s -> Maybe SortOrder
 shouldHighlightSortOrder env =
-  if timePassedSinceSortOrderChange env < sortOrderChangeHighlightPeriod
+  if Clock.diffTimeSpec (aeCurrTime env) (aeSortOrderLastChanged env) < changeHighlightPeriod
     then Just (aeSortOrder env)
     else Nothing
 
 shouldHighlightYank :: AppEnv s -> Bool
 shouldHighlightYank env =
-  Clock.diffTimeSpec (aeCurrTime env) (aeLastYanked env) < sortOrderChangeHighlightPeriod
+  Clock.diffTimeSpec (aeCurrTime env) (aeLastYanked env) < changeHighlightPeriod
 
 renderInfoPane :: AppEnv s -> B.Widget Widgets
 renderInfoPane env =
@@ -420,35 +420,35 @@ renderInfoPane env =
 
 renderMenuPane :: forall s. AppEnv s -> B.Widget Widgets
 renderMenuPane env =
-  let items = 
-        [ ( \e -> case aeOpenModal e of Just (ModalNotice n) -> noticeTitle n == (noticeTitle helpNotice); _ -> False
-          , "help [?]"
-          )
-        , ( \e -> case aeOpenModal e of Just (ModalSearch _ _ _) -> True; _ -> False
-          , "search [/]"
-          )
-        , ( \e -> case aeOpenModal e of Just (ModalWhyDepends _) -> True; _ -> False
-          , "why-depends [w]"
-          )
-        , ( \e -> shouldHighlightSortOrder e /= Nothing
-          , "change sort order [s]"
-          )
-        , ( shouldHighlightYank
-          , "yank [y]"
-          )
-        , ( const False
-          , "quit [q]"
+  let items =
+        [ ( \e -> case aeOpenModal e of Just (ModalNotice n) -> noticeTitle n == (noticeTitle helpNotice); _ -> False,
+            "help [?]"
+          ),
+          ( \e -> case aeOpenModal e of Just (ModalSearch _ _ _) -> True; _ -> False,
+            "search [/]"
+          ),
+          ( \e -> case aeOpenModal e of Just (ModalWhyDepends _) -> True; _ -> False,
+            "why-depends [w]"
+          ),
+          ( \e -> shouldHighlightSortOrder e /= Nothing,
+            "change sort order [s]"
+          ),
+          ( shouldHighlightYank,
+            "yank [y]"
+          ),
+          ( const False,
+            "quit [q]"
           )
         ]
-      widgets = 
-          [ B.txt label
-              & bool 
-                  (B.withAttr attrMenuUnfocused)
-                  (B.withAttr attrMenuFocused)
-                  (predicate env) 
+      widgets =
+        [ B.txt label
+            & bool
+              (B.withAttr attrMenuUnfocused)
+              (B.withAttr attrMenuFocused)
+              (predicate env)
           | (predicate, label) <- items
-          ]
-  in  widgets
+        ]
+   in widgets
         & intersperse (B.txt " ")
         & B.hBox
 
