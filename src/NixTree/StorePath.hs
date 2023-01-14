@@ -110,7 +110,9 @@ getNixVersion = do
 
     -- split by ".", take the first two, and convert them to numbers
     (major, minor) <- do
-      let maT : miT : _ = T.splitOn "." ver
+      (maT, miT) <- case T.splitOn "." ver of
+        p1 : p2 : _ -> Just (p1, p2)
+        _ -> Nothing
       ma <- readMaybe @Natural (toString maT)
       mi <- readMaybe @Natural (toString miT)
       return (ma, mi)
