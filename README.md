@@ -85,6 +85,12 @@ nix-tree --derivation '.#'
 nix-tree --derivation 'nixpkgs#asciiquarium'
 ```
 
+Run `nix-tree` on your current nixos system:
+
+```bash
+nix-tree /nix/var/nix/profiles/system
+```
+
 ## Contributing
 
 All contributions, issues and feature requests are welcome.
