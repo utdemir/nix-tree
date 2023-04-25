@@ -15,5 +15,5 @@ set -o errexit
 shopt -s globstar
 set -o xtrace
 
-ormolu $ormolu_flags {src,test}/**/*.hs
+ormolu $ormolu_flags {src,test}/**/*.hs Setup.hs
 nixpkgs-fmt  $nixpkgs_fmt_flags default.nix flake.nix

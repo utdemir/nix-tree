@@ -5,6 +5,7 @@ module Main where
 import Control.Concurrent.Async
 import Control.Exception (evaluate)
 import NixTree.App
+import NixTree.Man
 import NixTree.PathStats
 import qualified Options.Applicative as Opts
 import qualified Options.Applicative.Help.Pretty as Opts
@@ -21,17 +22,13 @@ data Opts = Opts
   { oInstallables :: [Installable],
     oVersion :: Bool,
     oDerivation :: Bool,
-    oImpure :: Bool
+    oImpure :: Bool,
+    oHelp :: Bool
   }
 
 optsParser :: Opts.ParserInfo Opts
 optsParser =
-  Opts.info (parser <**> Opts.helper) $
-    mconcat
-      [ Opts.progDesc "Interactively browse dependency graphs of Nix derivations.",
-        Opts.fullDesc,
-        Opts.footerDoc (Just keybindingsHelp)
-      ]
+  Opts.info parser mempty
   where
     parser :: Opts.Parser Opts
     parser =
@@ -50,11 +47,7 @@ optsParser =
         <*> Opts.switch (Opts.long "version" <> Opts.help "Show the nix-tree version")
         <*> Opts.switch (Opts.long "derivation" <> Opts.help "Operate on the store derivation rather than its outputs")
         <*> Opts.switch (Opts.long "impure" <> Opts.help "Allow access to mutable paths and repositories")
-
-    keybindingsHelp :: Opts.Doc
-    keybindingsHelp =
-      "Keybindings:"
-        Opts.<$$> (Opts.indent 2 . Opts.vsep $ map (Opts.text . toString) (lines helpText))
+        <*> Opts.switch (Opts.short 'h' <> Opts.long "help" <> Opts.help "Allow access to mutable paths and repositories")
 
 showAndFail :: Text -> IO a
 showAndFail msg = do
@@ -70,6 +63,10 @@ main = do
 
   when (opts & oVersion) $ do
     putTextLn $ "nix-tree " <> version
+    exitWith ExitSuccess
+
+  when (opts & oHelp) $ do
+    spawnManual
     exitWith ExitSuccess
 
   installables <- case opts & oInstallables of

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+* feat: Display bindings permanently  (thanks @ncfavier, PR: [#47][]) 
+
+[#47]: https://github.com/utdemir/nix-tree/issues/47
+
 ## 0.3.1 - 2022-12-10:
 
 * fix: Update 'brick' library (thanks @ncfavier, PR: [#47][]) 

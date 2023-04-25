@@ -1,0 +1,16 @@
+cradle:
+  multi:
+    - path: ./Setup.hs
+      config:
+        cradle:
+          none:
+    - path: ./src
+      config:
+        cradle:
+          cabal:
+            component: exe:nix-tree
+    - path: ./test
+      config:
+        cradle:
+          cabal:
+            component: test:nix-tree-tests

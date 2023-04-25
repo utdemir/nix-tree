@@ -1,5 +1,6 @@
 module NixTree.App (run, helpText) where
 
+import Brick (suspendAndResume')
 import qualified Brick as B
 import qualified Brick.BChan as B
 import qualified Brick.Widgets.Border as B
@@ -15,6 +16,7 @@ import qualified Data.Text as T
 import qualified Graphics.Vty as V
 import Lens.Micro (Traversal', _Just)
 import qualified NixTree.Clipboard as Clipboard
+import NixTree.Man
 import NixTree.PathStats
 import qualified System.Clock as Clock
 import qualified System.HrfSize as HRF
@@ -211,7 +213,7 @@ app =
             | k `elem` [V.KChar 'q', V.KEsc] ->
                 B.halt
           (B.VtyEvent (V.EvKey (V.KChar '?') []), Nothing) ->
-            put s {aeOpenModal = Just (ModalNotice helpNotice)}
+            suspendAndResume' spawnManual
           (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) -> do
             B.hScrollToBeginning (B.viewportScroll WidgetWhyDependsViewport)
             modify showWhyDepends

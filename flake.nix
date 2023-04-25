@@ -14,9 +14,18 @@
     let
       overlay = se: su: {
         haskellPackages = su.haskellPackages.override {
-          overrides = hse: _hsu: {
-            "nix-tree" = hse.callCabal2nix "nix-tree" self { };
-          };
+          overrides = hse: hsu:
+            let
+              workaround140774 = hpkg:
+                se.haskell.lib.overrideCabal hpkg (drv: {
+                  enableSeparateBinOutput = false;
+                });
+            in
+            {
+              "nix-tree" = hse.callCabal2nix "nix-tree" self { };
+              "ghcid" = workaround140774 hsu.ghcid;
+              "ormolu" = workaround140774 hsu.ormolu;
+            };
         };
         nix-tree =
           se.haskell.lib.justStaticExecutables

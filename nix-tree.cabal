@@ -11,8 +11,20 @@ author:              Utku Demir
 maintainer:          Utku Demir
 copyright:           Utku Demir
 category:            Language.Nix
-build-type:          Simple
-extra-source-files:  README.md, CHANGELOG.md
+build-type:          Custom
+extra-source-files:  README.md, CHANGELOG.md, usage.md
+
+custom-setup
+  setup-depends:     base
+                   , Cabal
+                   , pandoc
+                   , text
+                   , filepath
+                   , directory
+                   , unix
+                   , file-embed
+                   , bytestring
+                   
 
 common common-options
   ghc-options:        -threaded
@@ -43,6 +55,8 @@ common common-options
                       NixTree.App
                       Data.InvertedIndex
                       NixTree.Clipboard
+                      Paths_nix_tree
+                      NixTree.Man
   mixins:             base hiding (Prelude)
                     , relude (Relude as Prelude)
   build-depends:      base
@@ -61,6 +75,8 @@ common common-options
                     , directory
                     , optparse-applicative
                     , microlens
+                    , file-embed
+                    , temporary
 
 executable nix-tree
   import:             common-options
