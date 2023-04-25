@@ -99,7 +99,7 @@ To hack on it, simply run `nix-shell` and use `cabal` as usual. Please run `./fo
 
 ## Related tools
 
-* [nix-du](https://github.com/symphorien/nix-du)
-* [nix-melt](https://github.com/nix-community/nix-melt)
-* [nix-query-tree-viewer](https://github.com/cdepillabout/nix-query-tree-viewer)
-* [nix-visualize](https://github.com/craigmbooth/nix-visualize)
+* [nix-du](https://github.com/symphorien/nix-du): Visualise which gc-roots to delete to free some space in your nix store
+* [nix-melt](https://github.com/nix-community/nix-melt): A ranger-like flake.lock viewer
+* [nix-query-tree-viewer](https://github.com/cdepillabout/nix-query-tree-viewer): GTK viewer for the output of `nix-store --query --tree`
+* [nix-visualize](https://github.com/craigmbooth/nix-visualize): Uses the Nix package manager to visualize the dependencies of a given package
