@@ -100,5 +100,6 @@ To hack on it, simply run `nix-shell` and use `cabal` as usual. Please run `./fo
 ## Related tools
 
 * [nix-du](https://github.com/symphorien/nix-du)
+* [nix-melt](https://github.com/nix-community/nix-melt)
 * [nix-query-tree-viewer](https://github.com/cdepillabout/nix-query-tree-viewer)
 * [nix-visualize](https://github.com/craigmbooth/nix-visualize)
