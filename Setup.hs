@@ -1,16 +1,14 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 -- This Setup.hs converts a Markdown formatted manual to
 -- a man page and installs it to the correct location.
 --
 -- This is first Setup.hs rodeo, so it might not be "correct",
 -- but seems to work fine. Let me know if something looks off.
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 import Control.Monad (forM_, unless)
 import Data.Function ((&))
 import Data.String (fromString)
-import qualified Data.Text.IO as Text
 import qualified Data.Text.IO as Text
 import qualified Distribution.Simple as Cabal
 import qualified Distribution.Simple.InstallDirs as Cabal
@@ -49,12 +47,12 @@ getInfo lbi = do
 main :: IO ()
 main =
   Cabal.defaultMainWithHooks
-    Cabal.simpleUserHooks 
+    Cabal.simpleUserHooks
       { Cabal.postBuild = \_ bf _ lbi -> do
           let docsDir = (Cabal.buildDir lbi) </> "docs"
-          Info { iExecutableName } <- getInfo lbi
+          Info {iExecutableName} <- getInfo lbi
           let manPath = docsDir </> iExecutableName ++ ".1"
-          
+
           putStrLn $ "Generating man page: " ++ manPath
 
           createDirectoryIfMissing True docsDir
