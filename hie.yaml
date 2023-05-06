@@ -1,9 +1,5 @@
 cradle:
   multi:
-    - path: ./Setup.hs
-      config:
-        cradle:
-          none:
     - path: ./src
       config:
         cradle:

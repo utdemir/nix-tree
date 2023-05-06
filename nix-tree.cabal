@@ -15,17 +15,15 @@ build-type:          Custom
 extra-source-files:  README.md, CHANGELOG.md, usage.md
 
 custom-setup
-  setup-depends:     base
-                   , Cabal
-                   , pandoc
-                   , text
-                   , filepath
-                   , directory
-                   , unix
-                   , file-embed
-                   , bytestring
-                   
-
+  setup-depends: base
+               , Cabal
+               , directory
+               , filepath
+               , unix
+               , text    
+               , template-haskell
+               , pandoc
+  
 common common-options
   ghc-options:        -threaded
                       -Wall -Wpartial-fields -Wincomplete-record-updates -Widentities
@@ -53,9 +51,9 @@ common common-options
   other-modules:      NixTree.PathStats
                       NixTree.StorePath
                       NixTree.App
+                      Usage
                       Data.InvertedIndex
                       NixTree.Clipboard
-                      Paths_nix_tree
                       NixTree.Man
   mixins:             base hiding (Prelude)
                     , relude (Relude as Prelude)
@@ -75,14 +73,15 @@ common common-options
                     , directory
                     , optparse-applicative
                     , microlens
-                    , file-embed
                     , temporary
+                    , template-haskell
+                    , pandoc
 
 executable nix-tree
   import:             common-options
   ghc-options:        -Wunused-packages -threaded -with-rtsopts=-N
   main-is:            NixTree/Main.hs
-  hs-source-dirs:     src
+  hs-source-dirs:     src .
   default-language:   Haskell2010
   build-depends:      base >= 4.11 && < 5
                     , terminal-progress-bar

@@ -1,17 +1,17 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 -- This Setup.hs converts a Markdown formatted manual to
 -- a man page and installs it to the correct location.
 --
 -- This is first Setup.hs rodeo, so it might not be "correct",
 -- but seems to work fine. Let me know if something looks off.
-
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Monad (forM_, unless)
-import qualified Data.ByteString as ByteString
-import Data.FileEmbed (injectWith)
 import Data.Function ((&))
-import qualified Data.Text.IO as Text
 import Data.String (fromString)
+import qualified Data.Text.IO as Text
+import qualified Data.Text.IO as Text
 import qualified Distribution.Simple as Cabal
 import qualified Distribution.Simple.InstallDirs as Cabal
 import qualified Distribution.Simple.Setup as Cabal
@@ -21,17 +21,17 @@ import qualified Distribution.Types.LocalBuildInfo as Cabal
 import qualified Distribution.Types.PackageDescription as Cabal
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as Cabal
-import Data.Text.Encoding as Text
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 import System.Posix.Files (createSymbolicLink)
-import qualified Text.Pandoc as Pandoc
+import Usage
 
-const_MANUAL_FILE_NAME = "usage.md"
+embedded :: EmbeddedUsage
+embedded = $(embedUsage)
 
 data Info = Info
-  { iExecutableName :: String
-  , iProjectName :: String
+  { iExecutableName :: String,
+    iProjectName :: String
   }
 
 getInfo :: Cabal.LocalBuildInfo -> IO Info
@@ -40,44 +40,26 @@ getInfo lbi = do
     [exe] -> return . Cabal.unUnqualComponentName $ Cabal.exeName exe
     _ -> fail "There must be exactly one executable in the cabal file."
 
-  return Info
-    { iExecutableName = executableName
-    , iProjectName = Cabal.unPackageName $ Cabal.pkgName $ Cabal.package $ Cabal.localPkgDescr lbi
-    }
+  return
+    Info
+      { iExecutableName = executableName,
+        iProjectName = Cabal.unPackageName $ Cabal.pkgName $ Cabal.package $ Cabal.localPkgDescr lbi
+      }
 
 main :: IO ()
 main =
   Cabal.defaultMainWithHooks
-    Cabal.simpleUserHooks
+    Cabal.simpleUserHooks 
       { Cabal.postBuild = \_ bf _ lbi -> do
-          let extraSrcFiles = Cabal.extraSrcFiles $ Cabal.localPkgDescr lbi
-          unless (const_MANUAL_FILE_NAME `elem` extraSrcFiles) $
-            error $
-              "The file " ++ const_MANUAL_FILE_NAME ++ " must be listed in the extra-source-files field of the cabal file."
-
-          Info {..} <- getInfo lbi
-          let buildDir = Cabal.buildDir lbi
-
-          input <-
-            Text.readFile const_MANUAL_FILE_NAME
-              >>= Pandoc.runIOorExplode . Pandoc.readMarkdown Pandoc.def
-
-          manContents <- Pandoc.runIOorExplode $ Text.encodeUtf8 <$> Pandoc.writeMan Pandoc.def input
-          txtContents <- Pandoc.runIOorExplode $ Text.encodeUtf8 <$> Pandoc.writePlain Pandoc.def input
-
-          let docsDir = buildDir </> "docs"
-          createDirectoryIfMissing True docsDir
-
-          ByteString.writeFile (docsDir </> iExecutableName ++ ".1") manContents
+          let docsDir = (Cabal.buildDir lbi) </> "docs"
+          Info { iExecutableName } <- getInfo lbi
+          let manPath = docsDir </> iExecutableName ++ ".1"
           
+          putStrLn $ "Generating man page: " ++ manPath
 
-          let executablePath = buildDir </> iProjectName </> iExecutableName
-          compiledTemplate <- ByteString.readFile executablePath
-          let Just result =
-                compiledTemplate
-                  & injectWith (fromString "man") manContents
-                  >>= injectWith (fromString "txt") txtContents
-          ByteString.writeFile (executablePath ++ ".after") result
+          createDirectoryIfMissing True docsDir
+          Text.writeFile manPath (embeddedMan embedded)
+
           return (),
         Cabal.postInst = \_ installFlags _ lbi -> do
           let buildDir = Cabal.buildDir lbi
