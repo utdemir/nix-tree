@@ -2,13 +2,11 @@
 
 module Usage where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import Language.Haskell.TH
 import qualified Text.Pandoc as Pandoc
 import Language.Haskell.TH.Syntax (Quasi(qAddDependentFile))
-import Control.Monad.IO.Class (liftIO)
 
 data EmbeddedUsage = EmbeddedUsage
   { embeddedMan :: Text,

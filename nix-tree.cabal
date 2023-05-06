@@ -90,7 +90,7 @@ executable nix-tree
 test-suite nix-tree-tests
   import:           common-options
   type:             exitcode-stdio-1.0
-  hs-source-dirs:   test/ src/
+  hs-source-dirs:   test/ src/ .
   other-modules:    Test.Data.InvertedIndex
   main-is:          Test.hs
   build-depends:    base >=4.11 && < 5
