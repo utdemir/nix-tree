@@ -22,7 +22,8 @@ data Opts = Opts
     oStore :: String,
     oVersion :: Bool,
     oDerivation :: Bool,
-    oImpure :: Bool
+    oImpure :: Bool,
+    oDot :: Bool
   }
 
 optsParser :: Opts.ParserInfo Opts
@@ -65,6 +66,7 @@ optsParser =
         <*> Opts.switch (Opts.long "version" <> Opts.help "Show the nix-tree version")
         <*> Opts.switch (Opts.long "derivation" <> Opts.help "Operate on the store derivation rather than its outputs")
         <*> Opts.switch (Opts.long "impure" <> Opts.help "Allow access to mutable paths and repositories")
+        <*> Opts.switch (Opts.long "dot" <> Opts.help "Print the dependency graph in dot format")
 
     keybindingsHelp :: Opts.Doc
     keybindingsHelp =
@@ -123,7 +125,9 @@ main = do
       & chunks 50
       & mapConcurrently_ (mapM_ (\p -> evaluate (rnf p) >> incProgress bar 1))
 
-    run env
+    if opts & oDot
+      then putTextLn $ storeEnvToDot env
+      else run env
 
 chunks :: Int -> [a] -> [[a]]
 chunks _ [] = []

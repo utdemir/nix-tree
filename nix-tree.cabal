@@ -61,6 +61,7 @@ common common-options
                     , directory
                     , optparse-applicative
                     , microlens
+                    , dot
 
 executable nix-tree
   import:             common-options
