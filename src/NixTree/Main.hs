@@ -66,7 +66,7 @@ main = do
     exitWith ExitSuccess
 
   when (opts & oHelp) $ do
-    spawnManual
+    showManualSomehow
     exitWith ExitSuccess
 
   installables <- case opts & oInstallables of

@@ -1,4 +1,4 @@
-module NixTree.App (run, helpText) where
+module NixTree.App (run) where
 
 import Brick (suspendAndResume')
 import qualified Brick as B
@@ -20,6 +20,7 @@ import NixTree.Man
 import NixTree.PathStats
 import qualified System.Clock as Clock
 import qualified System.HrfSize as HRF
+import Usage (EmbeddedUsage(embeddedTxt), embedUsage)
 
 changeHighlightPeriod :: Clock.TimeSpec
 changeHighlightPeriod = Clock.TimeSpec 0 (500 * 1_000_000)
@@ -34,6 +35,7 @@ data Widgets
   | WidgetWhyDepends
   | WidgetSearch
   | WidgetWhyDependsViewport
+  | WidgetNoticeViewport
   deriving (Show, Eq, Ord)
 
 data Notice = Notice {noticeTitle :: Text, _noticeBody :: Text}
@@ -213,7 +215,7 @@ app =
             | k `elem` [V.KChar 'q', V.KEsc] ->
                 B.halt
           (B.VtyEvent (V.EvKey (V.KChar '?') []), Nothing) ->
-            suspendAndResume' spawnManual
+            put s { aeOpenModal = Just (ModalNotice helpNotice) }
           (B.VtyEvent (V.EvKey (V.KChar 'w') []), Nothing) -> do
             B.hScrollToBeginning (B.viewportScroll WidgetWhyDependsViewport)
             modify showWhyDepends
@@ -316,6 +318,21 @@ app =
           (B.VtyEvent (V.EvKey k []), Just (ModalNotice _))
             | k `elem` [V.KChar 'q', V.KEsc] ->
                 put s {aeOpenModal = Nothing}
+          (B.VtyEvent (V.EvKey k []), Just (ModalNotice _))
+            | k `elem` [V.KChar 'h', V.KLeft] ->
+                B.hScrollBy (B.viewportScroll WidgetNoticeViewport) (-1)
+          (B.VtyEvent (V.EvKey k []), Just (ModalNotice _))
+            | k `elem` [V.KChar 'j', V.KDown, V.KChar '\t'] ->
+                B.vScrollBy (B.viewportScroll WidgetNoticeViewport) 5
+          (B.VtyEvent (V.EvKey k []), Just (ModalNotice _))
+            | k `elem` [V.KChar 'k', V.KUp, V.KBackTab] ->
+                B.vScrollBy (B.viewportScroll WidgetNoticeViewport) (-5)
+          (B.VtyEvent (V.EvKey k []), Just (ModalNotice _))
+            | k `elem` [V.KChar 'l', V.KRight] ->
+                B.hScrollBy (B.viewportScroll WidgetNoticeViewport) 1
+          (B.VtyEvent (V.EvKey k []), Just (ModalNotice _))
+            | k `elem` [V.KChar ' ', V.KPageDown] ->
+                B.vScrollBy (B.viewportScroll WidgetNoticeViewport) 20
           -- handle our events
           (B.AppEvent (EventTick t), _) ->
             let new = s {aeCurrTime = t}
@@ -462,24 +479,14 @@ renderModal title widget =
     & B.vLimitPercent 60
     & B.centerLayer
 
-helpText :: Text
-helpText =
-  T.intercalate
-    "\n"
-    [ "hjkl/Arrow Keys : Navigate",
-      "w               : Open why-depends modal",
-      "/               : Open search modal",
-      "s               : Change sort order",
-      "y               : Yank selected path to clipboard",
-      "?               : Show help",
-      "q/Esc           : Quit / close modal"
-    ]
-
 helpNotice :: Notice
-helpNotice = Notice "Help" helpText
+helpNotice = Notice "Help" (embeddedTxt embeddedUsage)
 
-renderNotice :: Notice -> B.Widget a
-renderNotice (Notice title txt) = renderModal title (B.txt txt)
+renderNotice :: Notice -> B.Widget Widgets
+renderNotice (Notice title txt) = 
+  B.txt txt
+    & B.viewport WidgetNoticeViewport B.Vertical
+    & renderModal title  
 
 renderWhyDependsModal ::
   B.GenericList Widgets Seq (NonEmpty (Path s)) ->

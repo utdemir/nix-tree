@@ -4,7 +4,6 @@
 -- This is first Setup.hs rodeo, so it might not be "correct",
 -- but seems to work fine. Let me know if something looks off.
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 import Control.Monad (forM_, unless)
 import Data.Function ((&))
@@ -23,9 +22,6 @@ import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 import System.Posix.Files (createSymbolicLink)
 import Usage
-
-embedded :: EmbeddedUsage
-embedded = $(embedUsage)
 
 data Info = Info
   { iExecutableName :: String,
@@ -54,9 +50,9 @@ main =
           let manPath = docsDir </> iExecutableName ++ ".1"
 
           putStrLn $ "Generating man page: " ++ manPath
-
+          usage <- getUsage
           createDirectoryIfMissing True docsDir
-          Text.writeFile manPath (embeddedMan embedded)
+          Text.writeFile manPath (embeddedMan usage)
 
           return (),
         Cabal.postInst = \_ installFlags _ lbi -> do
