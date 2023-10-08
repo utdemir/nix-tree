@@ -18,7 +18,7 @@ data InvertedIndex a = InvertedIndex
   }
   deriving (Generic, Show)
 
-instance NFData a => NFData (InvertedIndex a)
+instance (NFData a) => NFData (InvertedIndex a)
 
 iiInsert :: Text -> a -> InvertedIndex a -> InvertedIndex a
 iiInsert txt val InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams} =
@@ -35,7 +35,7 @@ iiInsert txt val InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams} =
         orig
         (setToMap (Set.singleton txt) chrs)
 
-iiFromList :: Foldable f => f (Text, a) -> InvertedIndex a
+iiFromList :: (Foldable f) => f (Text, a) -> InvertedIndex a
 iiFromList =
   foldl'
     (flip (uncurry iiInsert))
@@ -65,7 +65,7 @@ iiSearch txt InvertedIndex {iiElems, iiUnigrams, iiBigrams, iiTrigrams}
   | otherwise = using trigramsOf iiTrigrams
   where
     lowerTxt = Text.toLower txt
-    using :: Ord c => (Text -> Set c) -> Map c (Set Text) -> Map Text a
+    using :: (Ord c) => (Text -> Set c) -> Map c (Set Text) -> Map Text a
     using getGrams m =
       Map.intersection m (setToMap () (getGrams txt))
         & Map.elems
