@@ -201,7 +201,7 @@ data StoreEnvOptions = StoreEnvOptions
 
 withStoreEnv ::
   forall m a.
-  MonadIO m =>
+  (MonadIO m) =>
   StoreEnvOptions ->
   NonEmpty Installable ->
   (forall s. StoreEnv s () -> m a) ->
