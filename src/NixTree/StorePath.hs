@@ -19,7 +19,10 @@ module NixTree.StorePath
   )
 where
 
-import Data.Aeson (FromJSON (..), Value (..), decode, (.:))
+import Data.Aeson (FromJSON (..), Object, Value (..), decode, (.:))
+import qualified Data.Aeson.Key as K
+import qualified Data.Aeson.KeyMap as KM
+import Data.Aeson.Types (Parser)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
@@ -148,7 +151,7 @@ data PathInfoOptions = PathInfoOptions
 getPathInfo :: NixStore -> NixVersion -> PathInfoOptions -> NonEmpty Installable -> IO (NonEmpty (StorePath s (StoreName s) ()))
 getPathInfo nixStore nixVersion options names = do
   infos <-
-    decode @[NixPathInfoResult]
+    decode @NixPathOutput
       <$> readProcessStdout_
         ( proc
             "nix"
@@ -161,7 +164,7 @@ getPathInfo nixStore nixVersion options names = do
             )
         )
       >>= maybe (fail "Failed parsing nix path-info output.") return
-      >>= mapM assertValidInfo
+      >>= mapM assertValidInfo . npoResults
       >>= maybe (fail "invariant violation: getPathInfo returned []") return . nonEmpty
 
   mapM infoToStorePath infos
@@ -344,3 +347,22 @@ instance FromJSON NixPathInfoResult where
               return $ NixPathInfoInvalid path
           )
   parseJSON _ = fail "Expecting an object."
+
+newtype NixPathOutput = NixPathOutput
+  { npoResults :: [NixPathInfoResult]
+  }
+
+obj2LegacyArray :: Object -> Parser [Value]
+obj2LegacyArray obj = mapM ((Object <$>) . addPathKey) (KM.toList obj)
+  where
+    addPathKey :: (K.Key, Value) -> Parser Object
+    addPathKey (key, Object info) = return $ KM.insert "path" (String $ K.toText key) info
+    addPathKey (_, _) = fail "Expecting an object"
+
+instance FromJSON NixPathOutput where
+  parseJSON (Array a) = NixPathOutput <$> mapM parseJSON (toList a)
+  parseJSON (Object o) = do
+    legacyArray <- obj2LegacyArray o
+    result <- mapM parseJSON legacyArray
+    return $ NixPathOutput result
+  parseJSON _ = fail "Expecting an array (nix<=2.18) or an object with mapping from path to info (nix>=2.19)."
