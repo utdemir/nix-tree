@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2 - 2023-11-28:
+
+* fix: Support new path-info syntax introduced in nix 2.19 (thanks @SuperSandro2000, @GrigorenkoPV9, issue: [#67][], PR: [#68][])
+
+[#67]: https://github.com/utdemir/nix-tree/issues/67
+[#68]: https://github.com/utdemir/nix-tree/issues/68
+
 ## 0.3.1 - 2022-12-10:
 
 * fix: Update 'brick' library (thanks @ncfavier, PR: [#47][]) 
