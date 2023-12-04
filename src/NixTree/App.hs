@@ -145,7 +145,7 @@ renderList ::
   Bool ->
   List s ->
   B.Widget Widgets
-renderList highlightSort isFocused =
+renderList highlightSort =
   B.renderList
     ( \_
        StorePath
@@ -179,7 +179,6 @@ renderList highlightSort isFocused =
                           ]
                   ]
     )
-    isFocused
   where
     underlineWhen so =
       if Just so == highlightSort
@@ -266,7 +265,7 @@ app =
                   Nothing -> put closed
                   Just (_, path) -> put $ selectPath path closed
           -- search modal
-          (B.VtyEvent (V.EvKey V.KEsc []), Just (ModalSearch _ _ _)) ->
+          (B.VtyEvent (V.EvKey V.KEsc []), Just (ModalSearch {})) ->
             put s {aeOpenModal = Nothing}
           (B.VtyEvent (V.EvKey k []), Just (ModalSearch l r xs))
             | k `elem` [V.KDown, V.KChar '\t'] ->
@@ -289,7 +288,7 @@ app =
           (B.VtyEvent (V.EvKey (V.KChar c) []), Just (ModalSearch l r _))
             | c `Set.member` allowedSearchChars ->
                 modify (showAndUpdateSearch (l <> T.singleton c) r)
-          (B.VtyEvent (V.EvKey (V.KBS) []), Just (ModalSearch l r _)) ->
+          (B.VtyEvent (V.EvKey V.KBS []), Just (ModalSearch l r _)) ->
             modify (showAndUpdateSearch (T.dropEnd 1 l) r)
           (B.VtyEvent (V.EvKey V.KEnter []), Just (ModalSearch _ _ xs)) ->
             let closed = s {aeOpenModal = Nothing}
@@ -309,9 +308,7 @@ app =
             let new = s {aeCurrTime = t}
              in do
                   put new
-                  if timePassedSinceSortOrderChange new <= sum (replicate 2 sortOrderChangeHighlightPeriod)
-                    then return ()
-                    else B.continueWithoutRedraw
+                  unless (timePassedSinceSortOrderChange new <= sum (replicate 2 sortOrderChangeHighlightPeriod)) B.continueWithoutRedraw
           -- ignore otherwise
           _ ->
             return (),
@@ -377,9 +374,8 @@ renderInfoPane env =
   let selected = selectedPath env
       immediateParents = psImmediateParents $ spPayload selected
    in B.vBox
-        [ ( let (f, s) = storeNameToSplitShortText (spName selected)
-             in B.txt f B.<+> underlineWhen SortOrderAlphabetical (B.txt s)
-          ),
+        [ let (f, s) = storeNameToSplitShortText (spName selected)
+           in B.txt f B.<+> underlineWhen SortOrderAlphabetical (B.txt s),
           [ B.txt $ "NAR Size: " <> prettySize (spSize selected),
             underlineWhen SortOrderClosureSize . B.txt $ "Closure Size: " <> prettySize (psTotalSize $ spPayload selected),
             underlineWhen SortOrderAddedSize . B.txt $ "Added Size: " <> prettySize (psAddedSize $ spPayload selected)
@@ -456,7 +452,7 @@ showWhyDepends env@AppEnv {aeActualStoreEnv} =
               xs = S.fromList $ whyDepends aeActualStoreEnv (spName selected)
            in B.list WidgetWhyDepends xs 1
                 & B.listMoveTo
-                  (fromMaybe 0 $ (((==) `on` fmap spName) route) `S.findIndexL` xs)
+                  (fromMaybe 0 $ ((==) `on` fmap spName) route `S.findIndexL` xs)
     }
 
 renderSearchModal :: Text -> Text -> B.GenericList Widgets Seq (Path s) -> B.Widget Widgets
@@ -600,7 +596,7 @@ mkList sortOrder name possible selected =
   let contents = S.sortBy (compareBySortOrder sortOrder) possible
    in B.list name contents 1
         & B.listMoveTo
-          (fromMaybe 0 $ selected >>= \s -> (((==) `on` spName) s) `S.findIndexL` contents)
+          (fromMaybe 0 $ selected >>= \s -> ((==) `on` spName) s `S.findIndexL` contents)
 
 -- Utils
 

@@ -34,7 +34,7 @@ mkIntermediateEnv env =
       { ipsAllRefs =
           M.unions
             ( M.fromList
-                [ (spName, const () <$> sp)
+                [ (spName, void sp)
                   | sp@StorePath {spName} <- spRefs curr,
                     env spName
                 ]
@@ -68,7 +68,7 @@ mkFinalEnv env =
           ( \sp@StorePath {spName, spPayload} ->
               M.insert
                 spName
-                (const () <$> sp)
+                (void sp)
                 (ipsAllRefs spPayload)
           )
         & M.unions
@@ -85,7 +85,7 @@ mkFinalEnv env =
             M.unionWith
               (<>)
               m
-              (M.fromList (map (\r -> (r, S.singleton spName)) spRefs))
+              (M.fromList (map (,S.singleton spName) spRefs))
         )
         M.empty
 
@@ -101,9 +101,7 @@ shortestPathTo env name =
          in if spName curr == name
               then Just (1 :: Int, currOut :| [])
               else
-                spRefs curr
-                  & fmap spPayload
-                  & catMaybes
+                mapMaybe spPayload (spRefs curr)
                   & \case
                     [] -> Nothing
                     xs -> case minimumBy (comparing fst) xs of
@@ -130,9 +128,7 @@ whyDepends env name =
         if spName curr == name
           then Just $ mkTreeish (curr {spRefs = map spName (spRefs curr)}) []
           else
-            spRefs curr
-              & map spPayload
-              & catMaybes
+            mapMaybe spPayload (spRefs curr)
               & NE.nonEmpty
               <&> NE.toList
               <&> mkTreeish (curr {spRefs = map spName (spRefs curr)})

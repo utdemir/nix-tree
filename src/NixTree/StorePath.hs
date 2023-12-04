@@ -156,9 +156,9 @@ getPathInfo nixStore nixVersion options names = do
         ( proc
             "nix"
             ( ["path-info", "--json"]
-                ++ (if options & pioIsImpure then ["--impure"] else [])
-                ++ (if options & pioIsRecursive then ["--recursive"] else [])
-                ++ (if (options & pioIsDerivation) && nixVersion >= Nix2_4 then ["--derivation"] else [])
+                ++ ["--impure" | options & pioIsImpure]
+                ++ ["--recursive" | options & pioIsRecursive]
+                ++ ["--derivation" | (options & pioIsDerivation) && nixVersion >= Nix2_4]
                 ++ (if nixVersion >= Nix2_4 then ["--extra-experimental-features", "nix-command flakes"] else [])
                 ++ map (toString . installableToText) (toList names)
             )
@@ -311,12 +311,7 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
           sp@StorePath {spName, spRefs} <- unsafeLookup name <$> gets fst
           refs <- mapM go spRefs
           let new = sp {spPayload = f sp {spRefs = refs}}
-          modify
-            ( \(as, bs) ->
-                ( HM.delete spName as,
-                  HM.insert spName new bs
-                )
-            )
+          modify $ bimap (HM.delete spName) (HM.insert spName new)
           return new
 
 --------------------------------------------------------------------------------
