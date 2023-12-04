@@ -70,7 +70,7 @@ main = do
 
   when (opts & oVersion) $ do
     putTextLn $ "nix-tree " <> version
-    exitWith ExitSuccess
+    exitSuccess
 
   installables <- case opts & oInstallables of
     p : ps ->
