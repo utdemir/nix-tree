@@ -19,7 +19,7 @@ module NixTree.StorePath
   )
 where
 
-import Data.Aeson (FromJSON (..), Object, Value (..), decode, (.:))
+import Data.Aeson (FromJSON (..), Value (..), decode, (.:))
 import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types (Parser)
@@ -331,38 +331,39 @@ data NixPathInfoResult
   = NixPathInfoValid NixPathInfo
   | NixPathInfoInvalid FilePath
 
-instance FromJSON NixPathInfoResult where
-  parseJSON (Object obj) =
-    ( NixPathInfoValid
-        <$> ( NixPathInfo
-                <$> obj .: "path"
-                <*> obj .: "narSize"
-                <*> obj .: "references"
-            )
-    )
-      <|> ( do
-              path <- obj .: "path"
-              valid <- obj .: "valid"
-              guard (not valid)
-              return $ NixPathInfoInvalid path
+parse2_18 :: Value -> Parser NixPathInfoResult
+parse2_18 (Object obj) =
+  ( NixPathInfoValid
+      <$> ( NixPathInfo
+              <$> obj .: "path"
+              <*> obj .: "narSize"
+              <*> obj .: "references"
           )
-  parseJSON _ = fail "Expecting an object."
+  )
+    <|> ( do
+            path <- obj .: "path"
+            valid <- obj .: "valid"
+            guard (not valid)
+            return $ NixPathInfoInvalid path
+        )
+parse2_18 _ = fail "Expecting an object."
+
+parse2_19 :: (FilePath, Value) -> Parser NixPathInfoResult
+parse2_19 (path, Object obj) =
+  NixPathInfoValid
+    <$> ( NixPathInfo
+            path
+            <$> obj .: "narSize"
+            <*> obj .: "references"
+        )
+parse2_19 (path, Null) = return $ NixPathInfoInvalid path
+parse2_19 (_, _) = fail "Expecting an object or null"
 
 newtype NixPathOutput = NixPathOutput
   { npoResults :: [NixPathInfoResult]
   }
 
-obj2LegacyArray :: Object -> Parser [Value]
-obj2LegacyArray obj = mapM ((Object <$>) . addPathKey) (KM.toList obj)
-  where
-    addPathKey :: (K.Key, Value) -> Parser Object
-    addPathKey (key, Object info) = return $ KM.insert "path" (String $ K.toText key) info
-    addPathKey (_, _) = fail "Expecting an object"
-
 instance FromJSON NixPathOutput where
-  parseJSON (Array a) = NixPathOutput <$> mapM parseJSON (toList a)
-  parseJSON (Object o) = do
-    legacyArray <- obj2LegacyArray o
-    result <- mapM parseJSON legacyArray
-    return $ NixPathOutput result
+  parseJSON (Array a) = NixPathOutput <$> mapM parse2_18 (toList a)
+  parseJSON (Object o) = NixPathOutput <$> mapM (parse2_19 . first K.toString) (KM.toList o)
   parseJSON _ = fail "Expecting an array (nix<=2.18) or an object with mapping from path to info (nix>=2.19)."
