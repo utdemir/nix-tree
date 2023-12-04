@@ -8,7 +8,7 @@ import NixTree.App
 import NixTree.PathStats
 import qualified Options.Applicative as Opts
 import qualified Options.Applicative.Help.Pretty as Opts
-import System.Directory (doesDirectoryExist, getHomeDirectory)
+import System.Directory (XdgDirectory (XdgState), doesDirectoryExist, getHomeDirectory, getXdgDirectory)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO (hPutStrLn)
@@ -77,10 +77,12 @@ main = do
       return $ p :| ps
     [] -> do
       home <- getHomeDirectory
+      nixXdgDirectory <- getXdgDirectory XdgState "nix/profile"
       roots <-
         filterM
           doesDirectoryExist
           [ home </> ".nix-profile",
+            nixXdgDirectory,
             "/var/run/current-system"
           ]
       case roots of
