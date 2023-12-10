@@ -463,8 +463,8 @@ renderSearchModal left right l =
       B.txt left
         B.<+> B.txt "|"
         B.<+> B.txt right
-          B.<=> B.hBorder
-          B.<=> renderList Nothing True l
+        B.<=> B.hBorder
+        B.<=> renderList Nothing True l
 
 showAndUpdateSearch :: Text -> Text -> AppEnv s -> AppEnv s
 showAndUpdateSearch left right env@AppEnv {aeInvertedIndex} =
