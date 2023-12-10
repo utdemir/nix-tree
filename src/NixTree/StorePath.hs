@@ -54,7 +54,8 @@ getNixStore = do
       args = ["--eval", "--expr", "(builtins.storeDir)", "--json"]
   out <-
     readProcessStdout_ (proc prog args)
-      <&> fmap mkNixStore . decode @FilePath
+      <&> fmap mkNixStore
+      . decode @FilePath
   case out of
     Nothing -> fail $ "Error interpreting output of: " ++ show (prog, args)
     Just p -> return p
