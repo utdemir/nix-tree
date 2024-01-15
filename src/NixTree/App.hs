@@ -13,6 +13,7 @@ import qualified Data.Sequence as S
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Graphics.Vty as V
+import qualified Graphics.Vty.Platform.Unix as V
 import Lens.Micro (Traversal', _Just)
 import qualified NixTree.Clipboard as Clipboard
 import NixTree.PathStats

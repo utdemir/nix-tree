@@ -48,7 +48,7 @@ common common-options
   build-depends:      base
                     , relude
                     , aeson
-                    , brick >= 1 && < 2
+                    , brick >= 2
                     , bytestring
                     , containers
                     , clock
@@ -58,6 +58,7 @@ common common-options
                     , typed-process
                     , unordered-containers
                     , vty
+                    , vty-unix
                     , directory
                     , optparse-applicative
                     , microlens
