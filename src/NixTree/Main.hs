@@ -42,9 +42,9 @@ optsParser =
                 ( Opts.metavar "INSTALLABLE"
                     <> Opts.helpDoc
                       ( Just $
-                          Opts.vsep 
-                            [ "A store path or a flake reference."
-                            , "Paths default to \"~/.nix-profile\" and \"/var/run/current-system\""
+                          Opts.vsep
+                            [ "A store path or a flake reference.",
+                              "Paths default to \"~/.nix-profile\" and \"/var/run/current-system\""
                             ]
                       )
                 )
@@ -56,8 +56,8 @@ optsParser =
     keybindingsHelp :: Opts.Doc
     keybindingsHelp =
       Opts.vsep
-        [ "Keybindings:"
-        , Opts.indent 2 . Opts.vsep $ map Opts.pretty (lines helpText)
+        [ "Keybindings:",
+          Opts.indent 2 . Opts.vsep $ map Opts.pretty (lines helpText)
         ]
 
 showAndFail :: Text -> IO a
