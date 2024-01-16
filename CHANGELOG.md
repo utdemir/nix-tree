@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3 - 2024-01-17:
+
+* chore: Update 'brick' & 'optparse-applicative' library to work with the newer Stackage snapshot (thanks @ncfavier, PR: [#78][]) 
+
+[#78]: https://github.com/utdemir/nix-tree/issues/78
+
 ## 0.3.2 - 2023-11-28:
 
 * fix: Support new path-info syntax introduced in nix 2.19 (thanks @SuperSandro2000, @GrigorenkoPV9, issue: [#67][], PR: [#68][])
