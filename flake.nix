@@ -1,6 +1,7 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    # Temporary until `haskell-updates` is merged. Move it back to `nixpkgs-unstable` once it is.
+    nixpkgs.url = "github:nixos/nixpkgs/haskell-updates";
     flake-utils.url = "github:numtide/flake-utils/main";
     flake-compat = {
       url = "github:edolstra/flake-compat/master";
