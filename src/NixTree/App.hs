@@ -134,9 +134,7 @@ run env = do
       return ()
 
   -- And run the application
-  let mkVty = V.mkVty V.defaultConfig
-  initialVty <- mkVty
-  _ <- B.customMain initialVty mkVty (Just chan) app appEnv
+  _ <- B.customMainWithDefaultVty (Just chan) app appEnv
 
   return ()
 
