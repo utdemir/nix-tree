@@ -12,7 +12,13 @@ Interactively browse dependency graphs of Nix derivations.
 `nix-tree` is on `nixpkgs` since `20.09`, so just use your preferred method for adding packages to your system, eg:
 
 ```
-nix-env -i nix-tree
+nix-env -iA nix-tree
+```
+
+Or, for flake enabled systems:
+
+```
+nix profile install 'nixpkgs#nix-tree'
 ```
 
 To run the current development version:
@@ -23,17 +29,20 @@ nix run github:utdemir/nix-tree -- --help
 
 ## Usage
 
-```
+```console
 $ nix-tree --help
-Usage: nix-tree [--version] [--derivation] [INSTALLABLE]
+Usage: nix-tree [INSTALLABLE] [--store STORE] [--version] [--derivation] [--impure]
+
   Interactively browse dependency graphs of Nix derivations.
 
 Available options:
-  --version                Show the nix-tree version.
-  --derivation             Operate on the store derivation rather than its
-                           outputs.
-  INSTALLABLE              A store path or a flake reference. Paths default to
-                           "~/.nix-profile" and "/var/run/current-system".
+  INSTALLABLE              A store path or a flake reference.
+                           Paths default to "~/.nix-profile" and "/var/run/current-system"
+  --store STORE            The URL of the Nix store, e.g. "daemon" or "https://cache.nixos.org"
+                           See "nix help-stores" for supported store types and settings.
+  --version                Show the nix-tree version
+  --derivation             Operate on the store derivation rather than its outputs
+  --impure                 Allow access to mutable paths and repositories
   -h,--help                Show this help text
 
 Keybindings:
@@ -66,12 +75,12 @@ with `| xargs -o nix-tree`. Examples:
 nix-build . --no-out-link | xargs -o nix-tree
 
 # Build time dependencies (passing a `.drv` path)
-nix-instantiate -r | xargs -o nix-tree --derivation
+nix-instantiate . | xargs -o nix-tree --derivation
 
 # Dependencies from shell.nix
 nix-build shell.nix -A inputDerivation | xargs -o nix-tree
 
-# All outputs of a derivation in nixpkgs:
+# All outputs of a derivation in nixpkgs
 nix-build '<nixpkgs>' -A openssl.all --no-out-link | xargs -o nix-tree
 ```
 
@@ -89,6 +98,20 @@ Run `nix-tree` on your current nixos system:
 
 ```bash
 nix-tree /nix/var/nix/profiles/system
+```
+
+Query the binary cache before download, with the `--store` option:
+
+```bash
+# Query the runtime dependency of `stellarium` (2 GiB closure) without download
+nix eval --raw 'nixpkgs#stellarium.outPath' | xargs -o nix-tree --store https://cache.nixos.org
+```
+
+For valid `--store` options, see [`nix help-stores`](https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-help-stores). For example,
+
+```bash
+# Build in a temporary chroot store and examine the output
+nix build --store /tmp/chroot-store 'nixpkgs#hello' --print-out-paths | xargs -o nix-tree --store /tmp/chroot-store
 ```
 
 ## Contributing
