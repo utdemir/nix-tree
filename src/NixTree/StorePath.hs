@@ -15,6 +15,7 @@ module NixTree.StorePath
     seBottomUp,
     seFetchRefs,
     mkStoreName,
+    storeEnvToDot,
   )
 where
 
@@ -25,7 +26,9 @@ import Data.Aeson.Types (Parser)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
+import qualified Data.Set as Set
 import qualified Data.Text as T
+import qualified Dot
 import System.FilePath.Posix (addTrailingPathSeparator, splitDirectories, (</>))
 import System.IO (hPutStrLn)
 import System.Process.Typed (proc, readProcessStdout_)
@@ -316,6 +319,39 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
           let new = sp {spPayload = f sp {spRefs = refs}}
           modify $ bimap (HM.delete spName) (HM.insert spName new)
           return new
+
+--------------------------------------------------------------------------------
+
+storeEnvToDot :: StoreEnv s a -> Text
+storeEnvToDot env =
+  seBottomUp go env
+    & seGetRoots
+    & toList
+    & map spPayload
+    & mconcat
+    & render
+  where
+    go sp =
+      fromList [Set.singleton (spName sp, spName ref) <> spPayload ref | ref <- spRefs sp]
+        & mconcat
+
+    render :: Set (StoreName s, StoreName s) -> Text
+    render edges =
+      Dot.DotGraph
+        Dot.Strict
+        Dot.Directed
+        Nothing
+        [ Dot.StatementEdge
+            ( Dot.EdgeStatement
+                (Dot.ListTwo (Dot.EdgeNode (mkNodeId from)) (Dot.EdgeNode (mkNodeId to)) [])
+                []
+            )
+          | (from, to) <- toList edges
+        ]
+        & Dot.encode
+
+    mkNodeId :: StoreName s -> Dot.NodeId
+    mkNodeId = fromString . toString . storeNameToShortText
 
 --------------------------------------------------------------------------------
 

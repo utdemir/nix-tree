@@ -31,7 +31,7 @@ nix run github:utdemir/nix-tree -- --help
 
 ```console
 $ nix-tree --help
-Usage: nix-tree [INSTALLABLE] [--store STORE] [--version] [--derivation] [--impure]
+Usage: nix-tree [INSTALLABLE] [--store STORE] [--version] [--derivation] [--impure] [--dot]
 
   Interactively browse dependency graphs of Nix derivations.
 
@@ -43,6 +43,7 @@ Available options:
   --version                Show the nix-tree version
   --derivation             Operate on the store derivation rather than its outputs
   --impure                 Allow access to mutable paths and repositories
+  --dot                    Print the dependency graph in dot format
   -h,--help                Show this help text
 
 Keybindings:
