@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 - 2024-01-21:
+
+* feat: Allow passing `--store` for alternative nix store (e.g. remote binary cache) (thanks @bryango, PR: [#79][])
+* feat: Graphviz export via `--dot` flag (thanks @SomeoneSerge, issue: [#59][])
+
+[#79]: https://github.com/utdemir/nix-tree/pull/79
+[#59]: https://github.com/utdemir/nix-tree/issues/59
+
 ## 0.3.3 - 2024-01-17:
 
 * chore: Update 'brick' & 'optparse-applicative' library to work with the newer Stackage snapshot (thanks @ncfavier, PR: [#78][]) 
