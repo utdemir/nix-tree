@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased:
+
+* fix: Restore terminal state properly after exiting (thanks @Atemu, PR: [#89])
+
 ## 0.4.0 - 2024-01-21:
 
 * feat: Allow passing `--store` for alternative nix store (e.g. remote binary cache) (thanks @bryango, PR: [#79][])

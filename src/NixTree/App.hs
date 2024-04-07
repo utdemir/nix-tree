@@ -134,7 +134,8 @@ run env = do
       return ()
 
   -- And run the application
-  _ <- B.customMainWithDefaultVty (Just chan) app appEnv
+  (_, vty) <- B.customMainWithDefaultVty (Just chan) app appEnv
+  V.shutdown vty
 
   return ()
 
@@ -194,7 +195,7 @@ app =
             Just (ModalNotice notice) -> renderNotice notice,
           renderMainScreen env
         ],
-      B.appChooseCursor = \_ -> const Nothing,
+      B.appChooseCursor = \_ _ -> Nothing,
       B.appHandleEvent = \e -> do
         s <- get
         case (e, aeOpenModal s) of
