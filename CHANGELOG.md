@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased:
+## 0.4.1 - 2024-04-07:
 
-* fix: Restore terminal state properly after exiting (thanks @Atemu, PR: [#89])
+* fix: Restore terminal state properly after exiting (thanks @Atemu, issue: [#88])
+
+[#88]: https://github.com/utdemir/nix-tree/issues/88
 
 ## 0.4.0 - 2024-01-21:
 
