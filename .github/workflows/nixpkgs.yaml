@@ -15,9 +15,8 @@ jobs:
           - macos-latest
         branch: 
           - nixpkgs-unstable
-          - "22.05"
-          - "21.11"
-          - "21.05"
+          - "23.11"
+          - "23.05"
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
