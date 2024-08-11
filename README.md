@@ -101,6 +101,13 @@ Run `nix-tree` on your current nixos system:
 nix-tree /nix/var/nix/profiles/system
 ```
 
+Run `nix-tree` on a flake reference of a nixosConfiguration:
+
+```bash
+nix build --print-out-paths --no-link '.#nixosConfigurations.foo.config.system.build.toplevel'
+nix-tree '.#nixosConfigurations.foo.config.system.build.toplevel'
+```
+
 Query the binary cache before download, with the `--store` option:
 
 ```bash
