@@ -19,7 +19,7 @@ version = VERSION_nix_tree
 
 data Opts = Opts
   { oInstallables :: [Installable],
-    oStore :: String,
+    oStore :: Maybe String,
     oVersion :: Bool,
     oDerivation :: Bool,
     oImpure :: Bool,
@@ -51,17 +51,18 @@ optsParser =
                       )
                 )
           )
-        <*> Opts.strOption
-          ( Opts.long "store"
-              <> Opts.metavar "STORE"
-              <> Opts.value "auto"
-              <> Opts.helpDoc
-                ( Just $
-                    Opts.vsep
-                      [ "The URL of the Nix store, e.g. \"daemon\" or \"https://cache.nixos.org\"",
-                        "See \"nix help-stores\" for supported store types and settings."
-                      ]
-                )
+        <*> optional
+          ( Opts.strOption
+              ( Opts.long "store"
+                  <> Opts.metavar "STORE"
+                  <> Opts.helpDoc
+                    ( Just $
+                        Opts.vsep
+                          [ "The URL of the Nix store, e.g. \"daemon\" or \"https://cache.nixos.org\"",
+                            "See \"nix help-stores\" for supported store types and settings."
+                          ]
+                    )
+              )
           )
         <*> Opts.switch (Opts.long "version" <> Opts.help "Show the nix-tree version")
         <*> Opts.switch (Opts.long "derivation" <> Opts.help "Operate on the store derivation rather than its outputs")
