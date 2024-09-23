@@ -50,10 +50,15 @@ unNixStore :: NixStore -> FilePath
 unNixStore NixStore = "/nix/store/"
 unNixStore (NixStoreCustom fp) = fp
 
-getStoreDir :: FilePath -> IO NixStore
+getStoreDir :: Maybe FilePath -> IO NixStore
 getStoreDir seoNixStore = do
   let prog = "nix-instantiate"
-      args = ["--eval", "--expr", "(builtins.storeDir)", "--json", "--option", "store", seoNixStore]
+      args =
+        ["--eval", "--expr", "(builtins.storeDir)", "--json"]
+          ++ ( case seoNixStore of
+                 Nothing -> []
+                 Just url -> ["--option", "store", url]
+             )
   out <-
     readProcessStdout_ (proc prog args)
       <&> fmap mkNixStore
@@ -149,7 +154,7 @@ data PathInfoOptions = PathInfoOptions
   { pioIsRecursive :: Bool,
     pioIsDerivation :: Bool,
     pioIsImpure :: Bool,
-    pioStoreURL :: FilePath
+    pioStoreURL :: Maybe FilePath
   }
 
 getPathInfo :: NixStore -> NixVersion -> PathInfoOptions -> NonEmpty Installable -> IO (NonEmpty (StorePath s (StoreName s) ()))
@@ -163,7 +168,10 @@ getPathInfo nixStore nixVersion options names = do
                 ++ ["--impure" | options & pioIsImpure]
                 ++ ["--recursive" | options & pioIsRecursive]
                 ++ ["--derivation" | (options & pioIsDerivation) && nixVersion >= Nix2_4]
-                ++ ["--store", options & pioStoreURL]
+                ++ ( case options & pioStoreURL of
+                       Nothing -> []
+                       Just url -> ["--store", url]
+                   )
                 ++ (if nixVersion >= Nix2_4 then ["--extra-experimental-features", "nix-command flakes"] else [])
                 ++ map (toString . installableToText) (toList names)
             )
@@ -205,7 +213,7 @@ data StoreEnv s payload = StoreEnv
 data StoreEnvOptions = StoreEnvOptions
   { seoIsDerivation :: Bool,
     seoIsImpure :: Bool,
-    seoStoreURL :: String
+    seoStoreURL :: Maybe String
   }
 
 withStoreEnv ::
