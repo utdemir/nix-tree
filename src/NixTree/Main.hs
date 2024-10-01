@@ -20,6 +20,7 @@ version = VERSION_nix_tree
 data Opts = Opts
   { oInstallables :: [Installable],
     oStore :: Maybe String,
+    oFile :: Maybe FilePath,
     oVersion :: Bool,
     oDerivation :: Bool,
     oImpure :: Bool,
@@ -61,6 +62,15 @@ optsParser =
                           [ "The URL of the Nix store, e.g. \"daemon\" or \"https://cache.nixos.org\"",
                             "See \"nix help-stores\" for supported store types and settings."
                           ]
+                    )
+              )
+          )
+        <*> optional
+          ( Opts.strOption
+              ( Opts.long "file"
+                  <> Opts.metavar "FILE"
+                  <> Opts.helpDoc
+                    ( Just $ Opts.vsep ["Interpret installables as attribute paths relative to the Nix expression stored in file."]
                     )
               )
           )
@@ -113,7 +123,8 @@ main = do
         StoreEnvOptions
           { seoIsDerivation = opts & oDerivation,
             seoIsImpure = opts & oImpure,
-            seoStoreURL = opts & oStore
+            seoStoreURL = opts & oStore,
+            seoFile = opts & oFile
           }
 
   withStoreEnv seo installables $ \env' -> do
