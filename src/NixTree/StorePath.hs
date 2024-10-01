@@ -154,7 +154,8 @@ data PathInfoOptions = PathInfoOptions
   { pioIsRecursive :: Bool,
     pioIsDerivation :: Bool,
     pioIsImpure :: Bool,
-    pioStoreURL :: Maybe FilePath
+    pioStoreURL :: Maybe FilePath,
+    pioFile :: Maybe FilePath
   }
 
 getPathInfo :: NixStore -> NixVersion -> PathInfoOptions -> NonEmpty Installable -> IO (NonEmpty (StorePath s (StoreName s) ()))
@@ -171,6 +172,10 @@ getPathInfo nixStore nixVersion options names = do
                 ++ ( case options & pioStoreURL of
                        Nothing -> []
                        Just url -> ["--store", url]
+                   )
+                ++ ( case options & pioFile of
+                       Nothing -> []
+                       Just file -> ["--file", file]
                    )
                 ++ (if nixVersion >= Nix2_4 then ["--extra-experimental-features", "nix-command flakes"] else [])
                 ++ map (toString . installableToText) (toList names)
@@ -213,7 +218,8 @@ data StoreEnv s payload = StoreEnv
 data StoreEnvOptions = StoreEnvOptions
   { seoIsDerivation :: Bool,
     seoIsImpure :: Bool,
-    seoStoreURL :: Maybe String
+    seoStoreURL :: Maybe String,
+    seoFile :: Maybe String
   }
 
 withStoreEnv ::
@@ -223,7 +229,7 @@ withStoreEnv ::
   NonEmpty Installable ->
   (forall s. StoreEnv s () -> m a) ->
   m a
-withStoreEnv StoreEnvOptions {seoIsDerivation, seoIsImpure, seoStoreURL} names cb = do
+withStoreEnv StoreEnvOptions {seoIsDerivation, seoIsImpure, seoStoreURL, seoFile} names cb = do
   nixStore <- liftIO $ getStoreDir seoStoreURL
 
   -- See: https://github.com/utdemir/nix-tree/issues/12
@@ -238,7 +244,7 @@ withStoreEnv StoreEnvOptions {seoIsDerivation, seoIsImpure, seoStoreURL} names c
       getPathInfo
         nixStore
         nixVersion
-        (PathInfoOptions {pioIsDerivation = seoIsDerivation, pioIsRecursive = False, pioIsImpure = seoIsImpure, pioStoreURL = seoStoreURL})
+        (PathInfoOptions {pioIsDerivation = seoIsDerivation, pioIsRecursive = False, pioIsImpure = seoIsImpure, pioStoreURL = seoStoreURL, pioFile = seoFile})
         names
 
   paths <-
@@ -246,7 +252,7 @@ withStoreEnv StoreEnvOptions {seoIsDerivation, seoIsImpure, seoStoreURL} names c
       getPathInfo
         nixStore
         nixVersion
-        (PathInfoOptions {pioIsDerivation = seoIsDerivation, pioIsRecursive = True, pioIsImpure = seoIsImpure, pioStoreURL = seoStoreURL})
+        (PathInfoOptions {pioIsDerivation = seoIsDerivation, pioIsRecursive = True, pioIsImpure = seoIsImpure, pioStoreURL = seoStoreURL, pioFile = seoFile})
         (Installable . toText . storeNameToPath . spName <$> roots)
 
   let env =
