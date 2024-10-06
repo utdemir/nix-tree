@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 - 2024-10-06:
+
+* feat: Add `--file` to run nix-tree against attributes from a file. (thanks @blackheaven, PR: [#103])
+* fix: Fix a spurious warning when running `nix-tree` as an untrusted user (thanks @Schweber & @bryango, issue [#99], PR: [#100])
+* chore: Add an example for running `nix-tree` on a NixOS configuration flake reference (thanks @thenbe, PR: [#97])
+
+[#103]: https://github.com/utdemir/nix-tree/pull/103
+[#99]: https://github.com/utdemir/nix-tree/issues/99
+[#100]: https://github.com/utdemir/nix-tree/pull/100
+[#97]: https://github.com/utdemir/nix-tree/pull/97
+
 ## 0.4.1 - 2024-04-07:
 
 * fix: Restore terminal state properly after exiting (thanks @Atemu, issue: [#88])
