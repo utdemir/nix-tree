@@ -31,7 +31,7 @@ nix run github:utdemir/nix-tree -- --help
 
 ```console
 $ nix-tree --help
-Usage: nix-tree [INSTALLABLE] [--store STORE] [--version] [--derivation] [--impure] [--dot]
+Usage: nix-tree [INSTALLABLE] [--store STORE] [--file FILE] [--version] [--derivation] [--impure] [--dot]
 
   Interactively browse dependency graphs of Nix derivations.
 
@@ -40,6 +40,7 @@ Available options:
                            Paths default to "~/.nix-profile" and "/var/run/current-system"
   --store STORE            The URL of the Nix store, e.g. "daemon" or "https://cache.nixos.org"
                            See "nix help-stores" for supported store types and settings.
+  --file FILE              Interpret installables as attribute paths relative to the Nix expression stored in file.
   --version                Show the nix-tree version
   --derivation             Operate on the store derivation rather than its outputs
   --impure                 Allow access to mutable paths and repositories
@@ -48,8 +49,8 @@ Available options:
 
 Keybindings:
   hjkl/Arrow Keys : Navigate
-  w               : Open why-depends mode
-  /               : Open search mode
+  w               : Open why-depends modal
+  /               : Open search modal
   s               : Change sort order
   y               : Yank selected path to clipboard
   ?               : Show help
