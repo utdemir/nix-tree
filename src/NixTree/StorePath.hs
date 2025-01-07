@@ -140,7 +140,8 @@ data StorePath s ref payload = StorePath
   { spName :: StoreName s,
     spSize :: Int,
     spRefs :: [ref],
-    spPayload :: payload
+    spPayload :: payload,
+    spSignatures :: [String]
   }
   deriving (Show, Eq, Ord, Functor, Generic)
 
@@ -187,7 +188,7 @@ getPathInfo nixStore nixVersion options names = do
 
   mapM infoToStorePath infos
   where
-    infoToStorePath NixPathInfo {npiPath, npiNarSize, npiReferences} = do
+    infoToStorePath NixPathInfo {npiPath, npiNarSize, npiReferences, npiSignatures} = do
       name <- mkStoreNameIO npiPath
       refs <- filter (/= name) <$> mapM mkStoreNameIO npiReferences
       return $
@@ -195,6 +196,7 @@ getPathInfo nixStore nixVersion options names = do
           { spName = name,
             spRefs = refs,
             spSize = npiNarSize,
+            spSignatures = npiSignatures,
             spPayload = ()
           }
     mkStoreNameIO p =
@@ -372,7 +374,8 @@ storeEnvToDot env =
 data NixPathInfo = NixPathInfo
   { npiPath :: FilePath,
     npiNarSize :: Int,
-    npiReferences :: [FilePath]
+    npiReferences :: [FilePath],
+    npiSignatures :: [String]
   }
 
 data NixPathInfoResult
@@ -386,6 +389,7 @@ parse2_18 (Object obj) =
               <$> obj .: "path"
               <*> obj .: "narSize"
               <*> obj .: "references"
+              <*> obj .: "signatures"
           )
   )
     <|> ( do
@@ -403,6 +407,7 @@ parse2_19 (path, Object obj) =
             path
             <$> obj .: "narSize"
             <*> obj .: "references"
+            <*> obj .: "signatures"
         )
 parse2_19 (path, Null) = return $ NixPathInfoInvalid path
 parse2_19 (_, _) = fail "Expecting an object or null"

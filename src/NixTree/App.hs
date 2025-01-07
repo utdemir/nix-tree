@@ -150,7 +150,8 @@ renderList highlightSort =
        StorePath
          { spName,
            spPayload = PathStats {psTotalSize, psAddedSize},
-           spRefs
+           spRefs,
+           spSignatures
          } ->
           let color =
                 if null spRefs
@@ -158,7 +159,10 @@ renderList highlightSort =
                   else identity
            in color $
                 B.hBox
-                  [ B.txt (storeNameToShortText spName)
+                  [ if null spSignatures
+                      then B.txt "  "
+                      else B.txt "✓ ",
+                    B.txt (storeNameToShortText spName)
                       & underlineWhen SortOrderAlphabetical
                       & B.padRight (B.Pad 1)
                       & B.padRight B.Max,
@@ -372,12 +376,18 @@ renderInfoPane :: AppEnv s -> B.Widget Widgets
 renderInfoPane env =
   let selected = selectedPath env
       immediateParents = psImmediateParents $ spPayload selected
+      signatures = spSignatures selected
    in B.vBox
         [ let (f, s) = storeNameToSplitShortText (spName selected)
            in B.txt f B.<+> underlineWhen SortOrderAlphabetical (B.txt s),
           [ B.txt $ "NAR Size: " <> prettySize (spSize selected),
             underlineWhen SortOrderClosureSize . B.txt $ "Closure Size: " <> prettySize (psTotalSize $ spPayload selected),
-            underlineWhen SortOrderAddedSize . B.txt $ "Added Size: " <> prettySize (psAddedSize $ spPayload selected)
+            underlineWhen SortOrderAddedSize . B.txt $ "Added Size: " <> prettySize (psAddedSize $ spPayload selected),
+            B.txt $
+              "Signatures: "
+                <> if null signatures
+                  then "✗"
+                  else (map (\s -> (fromMaybe "?" (viaNonEmpty head (T.splitOn ":" (T.pack s))))) signatures) & T.intercalate ", "
           ]
             & intersperse (B.txt " | ")
             & B.hBox,
