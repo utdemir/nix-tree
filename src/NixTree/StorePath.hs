@@ -4,6 +4,7 @@ module NixTree.StorePath
     storeNameToText,
     storeNameToShortText,
     storeNameToSplitShortText,
+    NixPathSignature (..),
     StorePath (..),
     Installable (..),
     StoreEnv (..),
@@ -141,7 +142,7 @@ data StorePath s ref payload = StorePath
     spSize :: Int,
     spRefs :: [ref],
     spPayload :: payload,
-    spSignatures :: [String]
+    spSignatures :: [NixPathSignature]
   }
   deriving (Show, Eq, Ord, Functor, Generic)
 
@@ -375,8 +376,23 @@ data NixPathInfo = NixPathInfo
   { npiPath :: FilePath,
     npiNarSize :: Int,
     npiReferences :: [FilePath],
-    npiSignatures :: [String]
+    npiSignatures :: [NixPathSignature]
   }
+
+data NixPathSignature = NixPathSignature
+  { npsKeyName :: Text,
+    npsSignature :: Text
+  }
+  deriving (Show, Eq, Ord, NFData, Generic)
+
+instance FromJSON NixPathSignature where
+  parseJSON (String t) =
+    case T.splitOn ":" t of
+      [key, sig]
+        | not (T.null key) && not (T.null sig) ->
+            return $ NixPathSignature key sig
+      _ -> fail "Expecting a string in the form of 'key:sig'."
+  parseJSON _ = fail "Expecting a string."
 
 data NixPathInfoResult
   = NixPathInfoValid NixPathInfo

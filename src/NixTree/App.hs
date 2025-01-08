@@ -382,15 +382,19 @@ renderInfoPane env =
            in B.txt f B.<+> underlineWhen SortOrderAlphabetical (B.txt s),
           [ B.txt $ "NAR Size: " <> prettySize (spSize selected),
             underlineWhen SortOrderClosureSize . B.txt $ "Closure Size: " <> prettySize (psTotalSize $ spPayload selected),
-            underlineWhen SortOrderAddedSize . B.txt $ "Added Size: " <> prettySize (psAddedSize $ spPayload selected),
-            B.txt $
-              "Signatures: "
-                <> if null signatures
-                  then "✗"
-                  else (map (\s -> (fromMaybe "?" (viaNonEmpty head (T.splitOn ":" (T.pack s))))) signatures) & T.intercalate ", "
+            underlineWhen SortOrderAddedSize . B.txt $ "Added Size: " <> prettySize (psAddedSize $ spPayload selected)
           ]
             & intersperse (B.txt " | ")
             & B.hBox,
+          B.txt $
+            "Signatures: "
+              <> if null signatures
+                then "✗"
+                else
+                  ( signatures
+                      & map npsKeyName
+                      & T.intercalate ", "
+                  ),
           B.txt $
             if null immediateParents
               then "Immediate Parents: -"
