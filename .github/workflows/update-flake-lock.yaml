@@ -8,12 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v30
       - name: Update flake.lock
         id: update-flake-lock
-        uses: DeterminateSystems/update-flake-lock@v20
+        uses: DeterminateSgiystems/update-flake-lock@v20
         with:
           token: ${{ secrets.PAT }}
           pr-title: "Update flake.lock"
