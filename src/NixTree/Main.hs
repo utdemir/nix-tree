@@ -8,7 +8,7 @@ import NixTree.App
 import NixTree.PathStats
 import qualified Options.Applicative as Opts
 import qualified Options.Applicative.Help.Pretty as Opts
-import System.Directory (XdgDirectory (XdgState), doesDirectoryExist, getHomeDirectory, getXdgDirectory)
+import System.Directory (XdgDirectory (XdgState), doesDirectoryExist, getHomeDirectory, getXdgDirectory, pathIsSymbolicLink)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO (hPutStrLn)
@@ -91,6 +91,17 @@ showAndFail msg = do
   hPutStrLn stderr . toString $ "Error: " <> msg
   exitWith (ExitFailure 1)
 
+isValidRoot :: FilePath -> IO Bool
+isValidRoot path = do
+  isExistingDirectory <- doesDirectoryExist path
+  if isExistingDirectory
+    then -- We need to check that it's a symlink (presumably to nix store),
+    -- because if it is just a directory, nix will try to interpret it as a flake.
+    -- We do doesDirectoryExist before pathIsSymbolicLink,
+    -- because the latter will fail if the path does not exist.
+      pathIsSymbolicLink path
+    else return False
+
 main :: IO ()
 main = do
   opts <-
@@ -110,7 +121,7 @@ main = do
       nixXdgDirectory <- getXdgDirectory XdgState "nix/profile"
       roots <-
         filterM
-          doesDirectoryExist
+          isValidRoot
           [ home </> ".nix-profile",
             nixXdgDirectory,
             "/var/run/current-system"
