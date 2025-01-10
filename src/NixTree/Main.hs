@@ -108,11 +108,13 @@ main = do
     [] -> do
       home <- getHomeDirectory
       nixXdgDirectory <- getXdgDirectory XdgState "nix/profile"
+      homeManagerDirectory <- getXdgDirectory XdgState "nix/profiles/home-manager"
       roots <-
         filterM
           doesDirectoryExist
           [ home </> ".nix-profile",
             nixXdgDirectory,
+            homeManagerDirectory,
             "/var/run/current-system"
           ]
       case roots of
