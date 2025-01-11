@@ -3,7 +3,7 @@
 ## 0.6.0 - 2025-01-11:
 
 * feat: Show signatures of store paths (thanks @caspervk, PR: [#107])
-* fix: Fix default nix-tree invocation not working when one of the default directories is not a store path (thanks @sg-qwt, @GrigorenkoPV, issue #[106], pr #[109], #[110])
+* fix: Fix default nix-tree invocation not working when one of the default directories is not a store path (thanks @sg-qwt, @GrigorenkoPV, issue [#106], pr [#109], [#110])
 
 [#107]: https://github.com/utdemir/nix-tree/pull/107
 [#106]: https://github.com/utdemir/nix-tree/issues/106
