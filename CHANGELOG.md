@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 - 2025-01-11:
 
 * feat: Show signatures of store paths (thanks @caspervk, PR: [#107])
 * fix: Fix default nix-tree invocation not working when one of the default directories is not a store path (thanks @sg-qwt, @GrigorenkoPV, issue #[106], pr #[109], #[110])
