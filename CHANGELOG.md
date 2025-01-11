@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+* feat: Show signatures of store paths (thanks @caspervk, PR: [#107])
+* fix: Fix default nix-tree invocation not working when one of the default directories is not a store path (thanks @sg-qwt, @GrigorenkoPV, issue #[106], pr #[109], #[110])
+
+[#107]: https://github.com/utdemir/nix-tree/pull/107
+[#106]: https://github.com/utdemir/nix-tree/issues/106
+[#109]: https://github.com/utdemir/nix-tree/pull/109
+[#110]: https://github.com/utdemir/nix-tree/pull/110
+
 ## 0.5.0 - 2024-10-06:
 
 * feat: Add `--file` to run nix-tree against attributes from a file. (thanks @blackheaven, PR: [#103])
