@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 - 2025-01-25:
+
+* chore: Relax brick upper bound to work with newer Stackage snapshot
+
 ## 0.6.0 - 2025-01-11:
 
 * feat: Show signatures of store paths (thanks @caspervk, PR: [#107])
