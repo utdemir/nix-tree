@@ -3,7 +3,7 @@ cabal-version:       2.4
 name:                nix-tree
 synopsis:            Interactively browse a Nix store paths dependencies
 description:         A terminal curses application to browse a Nix store paths dependencies
-version:             0.6.1
+version:             0.6.2
 homepage:            https://github.com/utdemir/nix-tree
 license:             BSD-3-Clause
 license-file:        LICENSE
