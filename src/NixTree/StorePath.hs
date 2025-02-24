@@ -20,7 +20,7 @@ module NixTree.StorePath
   )
 where
 
-import Data.Aeson (FromJSON (..), Value (..), decode, (.:))
+import Data.Aeson (FromJSON (..), Value (..), decode, eitherDecode, (.!=), (.:), (.:?))
 import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types (Parser)
@@ -163,7 +163,7 @@ data PathInfoOptions = PathInfoOptions
 getPathInfo :: NixStore -> NixVersion -> PathInfoOptions -> NonEmpty Installable -> IO (NonEmpty (StorePath s (StoreName s) ()))
 getPathInfo nixStore nixVersion options names = do
   infos <-
-    decode @NixPathOutput
+    eitherDecode @NixPathOutput
       <$> readProcessStdout_
         ( proc
             "nix"
@@ -183,7 +183,7 @@ getPathInfo nixStore nixVersion options names = do
                 ++ map (toString . installableToText) (toList names)
             )
         )
-      >>= maybe (fail "Failed parsing nix path-info output.") return
+      >>= either (\e -> fail $ "Failed parsing nix path-info output: " ++ show e) return
       >>= mapM assertValidInfo . npoResults
       >>= maybe (fail "invariant violation: getPathInfo returned []") return . nonEmpty
 
@@ -405,7 +405,7 @@ parse2_18 (Object obj) =
               <$> obj .: "path"
               <*> obj .: "narSize"
               <*> obj .: "references"
-              <*> obj .: "signatures"
+              <*> (obj .:? "signatures" .!= [])
           )
   )
     <|> ( do
@@ -423,7 +423,7 @@ parse2_19 (path, Object obj) =
             path
             <$> obj .: "narSize"
             <*> obj .: "references"
-            <*> obj .: "signatures"
+            <*> (obj .:? "signatures" .!= [])
         )
 parse2_19 (path, Null) = return $ NixPathInfoInvalid path
 parse2_19 (_, _) = fail "Expecting an object or null"
