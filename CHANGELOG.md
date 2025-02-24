@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 - 2025-02-25:
+
+* fix: Fix a failure when the store path does not have a signature. (thanks @minhtrancccp, issue [#114]))
+
+[#114]: https://github.com/utdemir/nix-tree/issues/114
+
 ## 0.6.1 - 2025-01-25:
 
 * chore: Relax brick upper bound to work with newer Stackage snapshot
