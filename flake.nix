@@ -28,7 +28,9 @@
         pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
       in
       {
-        defaultPackage = pkgs.nix-tree;
+        packages = {
+          default = pkgs.nix-tree;
+        };
         devShell = pkgs.haskellPackages.shellFor {
           packages = p: [ p."nix-tree" ];
           buildInputs = [
