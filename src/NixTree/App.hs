@@ -38,8 +38,8 @@ data Notice = Notice Text Text
 
 data Modal s
   = ModalNotice Notice
-  | ModalWhyDepends (B.GenericList Widgets Seq (NonEmpty (Path s)))
-  | ModalSearch Text Text (B.GenericList Widgets Seq (Path s))
+  | ModalWhyDepends (B.GenericList Widgets Seq (NonEmpty Path))
+  | ModalSearch Text Text (B.GenericList Widgets Seq Path)
 
 succCycle :: forall a. (Bounded a, Enum a) => a -> a
 succCycle a
@@ -47,21 +47,21 @@ succCycle a
   | otherwise = succ a
 
 data AppEnv s = AppEnv
-  { aeActualStoreEnv :: StoreEnv s (PathStats s),
-    aeInvertedIndex :: InvertedIndex (Path s),
-    aePrevPane :: List s,
-    aeCurrPane :: List s,
-    aeNextPane :: List s,
-    aeParents :: [List s],
+  { aeActualStoreEnv :: StoreEnv PathStats,
+    aeInvertedIndex :: InvertedIndex Path,
+    aePrevPane :: List,
+    aeCurrPane :: List,
+    aeNextPane :: List,
+    aeParents :: [List],
     aeOpenModal :: Maybe (Modal s),
     aeSortOrder :: SortOrder,
     aeSortOrderLastChanged :: Clock.TimeSpec,
     aeCurrTime :: Clock.TimeSpec
   }
 
-type Path s = StorePath s (StoreName s) (PathStats s)
+type Path = StorePath StoreName PathStats
 
-type List s = B.GenericList Widgets Seq (Path s)
+type List = B.GenericList Widgets Seq Path
 
 data SortOrder
   = SortOrderAlphabetical
@@ -71,12 +71,12 @@ data SortOrder
 
 B.suffixLenses ''AppEnv
 
-_ModalWhyDepends :: Traversal' (Modal s) (B.GenericList Widgets Seq (NonEmpty (Path s)))
+_ModalWhyDepends :: Traversal' (Modal s) (B.GenericList Widgets Seq (NonEmpty Path))
 _ModalWhyDepends f m = case m of
   ModalWhyDepends l -> ModalWhyDepends <$> f l
   _ -> pure m
 
-compareBySortOrder :: SortOrder -> Path s -> Path s -> Ordering
+compareBySortOrder :: SortOrder -> Path -> Path -> Ordering
 compareBySortOrder SortOrderAlphabetical = compare `on` T.toLower . storeNameToShortText . spName
 compareBySortOrder SortOrderClosureSize = compare `on` Down . psTotalSize . spPayload
 compareBySortOrder SortOrderAddedSize = compare `on` Down . psAddedSize . spPayload
@@ -85,7 +85,7 @@ attrTerminal, attrUnderlined :: B.AttrName
 attrTerminal = B.attrName "terminal"
 attrUnderlined = B.attrName "underlined"
 
-run :: StoreEnv s (PathStats s) -> IO ()
+run :: StoreEnv PathStats -> IO ()
 run env = do
   -- Create the inverted index, and start evaluating it in the background
   let ii = iiFromList . toList . fmap (\sp -> (storeNameToText (spName sp), sp)) $ seAll env
@@ -142,14 +142,14 @@ run env = do
 renderList ::
   Maybe SortOrder ->
   Bool ->
-  List s ->
+  List ->
   B.Widget Widgets
 renderList highlightSort =
   B.renderList
     ( \_
        StorePath
          { spName,
-           spPayload = PathStats {psTotalSize, psAddedSize},
+           spPayload = PathStats {psTotalSize, psAddedSize, psDisambiguationChars},
            spRefs,
            spSignatures
          } ->
@@ -162,7 +162,7 @@ renderList highlightSort =
                   [ if null spSignatures
                       then B.txt "  "
                       else B.txt "✓ ",
-                    B.txt (storeNameToShortText spName)
+                    B.txt (storeNameToShortTextWithDisambiguation psDisambiguationChars spName)
                       & underlineWhen SortOrderAlphabetical
                       & B.padRight (B.Pad 1)
                       & B.padRight B.Max,
@@ -336,7 +336,7 @@ app =
             ]
         )
 
-yankToClipboard :: StoreName s -> IO (Either Notice ())
+yankToClipboard :: StoreName -> IO (Either Notice ())
 yankToClipboard p =
   Clipboard.copy (toText $ storeNameToPath p)
     <&> \case
@@ -438,7 +438,7 @@ renderNotice :: Notice -> B.Widget a
 renderNotice (Notice title txt) = renderModal title (B.txt txt)
 
 renderWhyDependsModal ::
-  B.GenericList Widgets Seq (NonEmpty (Path s)) ->
+  B.GenericList Widgets Seq (NonEmpty Path) ->
   B.Widget Widgets
 renderWhyDependsModal l =
   B.renderList renderDepends True l
@@ -468,7 +468,7 @@ showWhyDepends env@AppEnv {aeActualStoreEnv} =
                   (fromMaybe 0 $ ((==) `on` fmap spName) route `S.findIndexL` xs)
     }
 
-renderSearchModal :: Text -> Text -> B.GenericList Widgets Seq (Path s) -> B.Widget Widgets
+renderSearchModal :: Text -> Text -> B.GenericList Widgets Seq Path -> B.Widget Widgets
 renderSearchModal left right l =
   renderModal "Search" window
   where
@@ -490,10 +490,10 @@ showAndUpdateSearch left right env@AppEnv {aeInvertedIndex} =
               & S.fromList
        in B.list WidgetSearch xs 1
 
-move :: (List s -> List s) -> B.EventM n (AppEnv s) ()
+move :: (List -> List) -> B.EventM n (AppEnv s) ()
 move = moveF . modify
 
-moveF :: B.EventM n (List s) () -> B.EventM n (AppEnv s) ()
+moveF :: B.EventM n List () -> B.EventM n (AppEnv s) ()
 moveF f = do
   B.zoom aeCurrPaneL f
   modify repopulateNextPane
@@ -534,7 +534,7 @@ repopulateNextPane env@AppEnv {aeActualStoreEnv, aeNextPane, aeSortOrder} =
               aeNextPane
         }
 
-sortPane :: SortOrder -> List s -> List s
+sortPane :: SortOrder -> List -> List
 sortPane so l =
   let selected = B.listSelectedElement l
       elems =
@@ -552,10 +552,10 @@ sortPanes env@AppEnv {aeParents, aePrevPane, aeCurrPane, aeNextPane, aeSortOrder
       aePrevPane = sortPane aeSortOrder aePrevPane
     }
 
-selectedPath :: AppEnv s -> Path s
+selectedPath :: AppEnv s -> Path
 selectedPath = NE.head . selectedPaths
 
-selectedPaths :: AppEnv s -> NonEmpty (Path s)
+selectedPaths :: AppEnv s -> NonEmpty Path
 selectedPaths AppEnv {aePrevPane, aeCurrPane, aeParents} =
   let parents =
         mapMaybe
@@ -565,7 +565,7 @@ selectedPaths AppEnv {aePrevPane, aeCurrPane, aeParents} =
         Nothing -> error "invariant violation: no selected element"
         Just (_, p) -> p :| parents
 
-selectPath :: NonEmpty (Path s) -> AppEnv s -> AppEnv s
+selectPath :: NonEmpty Path -> AppEnv s -> AppEnv s
 selectPath path env
   | (spName <$> path) == (spName <$> selectedPaths env) =
       env
@@ -602,9 +602,9 @@ selectPath path env@AppEnv {aeActualStoreEnv} =
 mkList ::
   SortOrder ->
   n ->
-  Seq (Path s) ->
-  Maybe (Path s) ->
-  B.GenericList n Seq (Path s)
+  Seq Path ->
+  Maybe Path ->
+  B.GenericList n Seq Path
 mkList sortOrder name possible selected =
   let contents = S.sortBy (compareBySortOrder sortOrder) possible
    in B.list name contents 1

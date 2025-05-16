@@ -13,21 +13,22 @@ import qualified Data.Map.Lazy as M
 import qualified Data.Set as S
 import NixTree.StorePath
 
-data IntermediatePathStats s = IntermediatePathStats
-  { ipsAllRefs :: M.Map (StoreName s) (StorePath s (StoreName s) ())
+data IntermediatePathStats = IntermediatePathStats
+  { ipsAllRefs :: M.Map StoreName (StorePath StoreName ())
   }
 
-data PathStats s = PathStats
+data PathStats = PathStats
   { psTotalSize :: !Int,
     psAddedSize :: !Int,
-    psImmediateParents :: [StoreName s]
+    psImmediateParents :: [StoreName],
+    psDisambiguationChars :: !Int
   }
   deriving (Show, Generic, NFData)
 
 mkIntermediateEnv ::
-  (StoreName s -> Bool) ->
-  StoreEnv s () ->
-  StoreEnv s (IntermediatePathStats s)
+  (StoreName -> Bool) ->
+  StoreEnv () ->
+  StoreEnv IntermediatePathStats
 mkIntermediateEnv env =
   seBottomUp $ \curr ->
     IntermediatePathStats
@@ -42,10 +43,11 @@ mkIntermediateEnv env =
             )
       }
 
-mkFinalEnv :: StoreEnv s (IntermediatePathStats s) -> StoreEnv s (PathStats s)
+mkFinalEnv :: StoreEnv IntermediatePathStats -> StoreEnv PathStats
 mkFinalEnv env =
   let totalSize = calculateEnvSize env
       immediateParents = calculateImmediateParents (sePaths env)
+      disambiguationChars = seDisambiguationChars env
    in flip seBottomUp env $ \StorePath {spName, spSize, spPayload} ->
         let filteredSize =
               seFetchRefs env (/= spName) (seRoots env)
@@ -57,10 +59,13 @@ mkFinalEnv env =
                     + calculateRefsSize (ipsAllRefs spPayload),
                 psAddedSize = addedSize,
                 psImmediateParents =
-                  maybe [] S.toList $ M.lookup spName immediateParents
+                  maybe [] S.toList $ M.lookup spName immediateParents,
+                psDisambiguationChars =
+                  M.lookup spName disambiguationChars
+                    & maybe 0 id
               }
   where
-    calculateEnvSize :: StoreEnv s (IntermediatePathStats s) -> Int
+    calculateEnvSize :: StoreEnv IntermediatePathStats -> Int
     calculateEnvSize e =
       seGetRoots e
         & toList
@@ -73,12 +78,12 @@ mkFinalEnv env =
           )
         & M.unions
         & calculateRefsSize
-    calculateRefsSize :: (Functor f, Foldable f) => f (StorePath s a b) -> Int
+    calculateRefsSize :: (Functor f, Foldable f) => f (StorePath a b) -> Int
     calculateRefsSize = sum . fmap spSize
     calculateImmediateParents ::
       (Foldable f) =>
-      f (StorePath s (StoreName s) b) ->
-      M.Map (StoreName s) (S.Set (StoreName s))
+      f (StorePath StoreName b) ->
+      M.Map StoreName (S.Set StoreName)
     calculateImmediateParents =
       foldl'
         ( \m StorePath {spName, spRefs} ->
@@ -89,11 +94,56 @@ mkFinalEnv env =
         )
         M.empty
 
-calculatePathStats :: StoreEnv s () -> StoreEnv s (PathStats s)
+    seShortNames :: StoreEnv a -> M.Map Text [StoreName]
+    seShortNames env =
+      let paths = seAll env & toList
+       in foldl'
+            ( \m StorePath {spName} ->
+                let (_, shortName) = storeNameToSplitShortText spName
+                 in M.alter
+                      ( \case
+                          Nothing -> Just [spName]
+                          Just xs -> Just (spName : xs)
+                      )
+                      shortName
+                      m
+            )
+            M.empty
+            paths
+
+    seDisambiguationChars :: StoreEnv a -> M.Map StoreName Int
+    seDisambiguationChars env =
+      M.toList (seShortNames env)
+        & map snd
+        & concatMap
+          ( \xs ->
+              let chrs = disambiguate xs
+               in map (\x -> (x, chrs)) xs
+          )
+        & M.fromList
+
+    disambiguate :: [StoreName] -> Int
+    disambiguate xs = go 0
+      where
+        go n =
+          if isGood n
+            then n
+            else go (n + 2)
+
+        isGood n =
+          xs
+            & map (storeNameToShortTextWithDisambiguation n)
+            & allUnique
+
+        allUnique xx =
+          let unique = S.fromList xx
+           in length unique == length xx
+
+calculatePathStats :: StoreEnv () -> StoreEnv PathStats
 calculatePathStats = mkFinalEnv . mkIntermediateEnv (const True)
 
 -- TODO: This can be precomputed.
-shortestPathTo :: StoreEnv s a -> StoreName s -> NonEmpty (StorePath s (StoreName s) a)
+shortestPathTo :: StoreEnv a -> StoreName -> NonEmpty (StorePath StoreName a)
 shortestPathTo env name =
   seBottomUp
     ( \curr ->
@@ -121,9 +171,9 @@ shortestPathTo env name =
 -- We iterate the dependency graph bottom up. Every node contains a set of paths which represent
 -- the why-depends output from that node down. The set of paths is represented as a "Treeish" object,
 -- which is a trie-like structure.
-whyDepends :: forall s a. StoreEnv s a -> StoreName s -> [NonEmpty (StorePath s (StoreName s) a)]
+whyDepends :: forall a. StoreEnv a -> StoreName -> [NonEmpty (StorePath StoreName a)]
 whyDepends env name =
-  seBottomUp @_ @_ @(Maybe (Treeish (StorePath s (StoreName s) a)))
+  seBottomUp @_ @(Maybe (Treeish (StorePath StoreName a)))
     ( \curr ->
         if spName curr == name
           then Just $ mkTreeish (curr {spRefs = map spName (spRefs curr)}) []

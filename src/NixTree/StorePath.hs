@@ -4,6 +4,7 @@ module NixTree.StorePath
     storeNameToText,
     storeNameToShortText,
     storeNameToSplitShortText,
+    storeNameToShortTextWithDisambiguation,
     NixPathSignature (..),
     StorePath (..),
     Installable (..),
@@ -70,11 +71,11 @@ getStoreDir seoNixStore = do
 
 --------------------------------------------------------------------------------
 
-data StoreName s = StoreName NixStore Text
+data StoreName = StoreName NixStore Text
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (NFData, Hashable)
 
-mkStoreName :: NixStore -> FilePath -> Maybe (StoreName a)
+mkStoreName :: NixStore -> FilePath -> Maybe StoreName
 mkStoreName ns path = do
   let ps = unNixStore ns
   guard $ ps `isPrefixOf` path
@@ -82,18 +83,24 @@ mkStoreName ns path = do
   sn <- listToMaybe ds
   return $ StoreName ns (toText sn)
 
-storeNameToText :: StoreName a -> Text
+storeNameToText :: StoreName -> Text
 storeNameToText (StoreName _ n) = n
 
-storeNameToPath :: StoreName a -> FilePath
+storeNameToPath :: StoreName -> FilePath
 storeNameToPath (StoreName ns sn) = unNixStore ns </> toString sn
 
-storeNameToShortText :: StoreName a -> Text
+storeNameToShortText :: StoreName -> Text
 storeNameToShortText = snd . storeNameToSplitShortText
 
-storeNameToSplitShortText :: StoreName a -> (Text, Text)
+storeNameToShortTextWithDisambiguation :: Int -> StoreName -> Text
+storeNameToShortTextWithDisambiguation 0 sn = storeNameToShortText sn
+storeNameToShortTextWithDisambiguation n (StoreName ns sn) =
+  let (f, s) = storeNameToSplitShortText (StoreName ns sn)
+   in T.take n f <> "...-" <> s
+
+storeNameToSplitShortText :: StoreName -> (Text, Text)
 storeNameToSplitShortText txt =
-  case T.span (/= '-') . T.pack $ storeNameToPath txt of
+  case T.span (/= '-') $ storeNameToText txt of
     (f, s) | Just (c, s'') <- T.uncons s -> (T.snoc f c, s'')
     e -> e
 
@@ -137,8 +144,8 @@ getNixVersion = do
 
 --------------------------------------------------------------------------------
 
-data StorePath s ref payload = StorePath
-  { spName :: StoreName s,
+data StorePath ref payload = StorePath
+  { spName :: StoreName,
     spSize :: Int,
     spRefs :: [ref],
     spPayload :: payload,
@@ -146,7 +153,7 @@ data StorePath s ref payload = StorePath
   }
   deriving (Show, Eq, Ord, Functor, Generic)
 
-instance (NFData a, NFData b) => NFData (StorePath s a b)
+instance (NFData a, NFData b) => NFData (StorePath a b)
 
 newtype Installable = Installable {installableToText :: Text}
 
@@ -160,7 +167,7 @@ data PathInfoOptions = PathInfoOptions
     pioFile :: Maybe FilePath
   }
 
-getPathInfo :: NixStore -> NixVersion -> PathInfoOptions -> NonEmpty Installable -> IO (NonEmpty (StorePath s (StoreName s) ()))
+getPathInfo :: NixStore -> NixVersion -> PathInfoOptions -> NonEmpty Installable -> IO (NonEmpty (StorePath StoreName ()))
 getPathInfo nixStore nixVersion options names = do
   infos <-
     eitherDecode @NixPathOutput
@@ -212,9 +219,9 @@ getPathInfo nixStore nixVersion options names = do
 
 --------------------------------------------------------------------------------
 
-data StoreEnv s payload = StoreEnv
-  { sePaths :: HashMap (StoreName s) (StorePath s (StoreName s) payload),
-    seRoots :: NonEmpty (StoreName s)
+data StoreEnv payload = StoreEnv
+  { sePaths :: HashMap StoreName (StorePath StoreName payload),
+    seRoots :: NonEmpty StoreName
   }
   deriving (Functor, Generic, NFData)
 
@@ -230,7 +237,7 @@ withStoreEnv ::
   (MonadIO m) =>
   StoreEnvOptions ->
   NonEmpty Installable ->
-  (forall s. StoreEnv s () -> m a) ->
+  (StoreEnv () -> m a) ->
   m a
 withStoreEnv StoreEnvOptions {seoIsDerivation, seoIsImpure, seoStoreURL, seoFile} names cb = do
   nixStore <- liftIO $ getStoreDir seoStoreURL
@@ -268,26 +275,26 @@ withStoreEnv StoreEnvOptions {seoIsDerivation, seoIsImpure, seoStoreURL, seoFile
           (roots <&> spName)
   cb env
 
-seLookup :: StoreEnv s a -> StoreName s -> StorePath s (StoreName s) a
+seLookup :: StoreEnv a -> StoreName -> StorePath StoreName a
 seLookup StoreEnv {sePaths} name =
   fromMaybe
     (error $ "invariant violation, StoreName not found: " <> show name)
     (HM.lookup name sePaths)
 
-seAll :: StoreEnv s a -> NonEmpty (StorePath s (StoreName s) a)
+seAll :: StoreEnv a -> NonEmpty (StorePath StoreName a)
 seAll StoreEnv {sePaths} = case HM.elems sePaths of
   [] -> error "invariant violation: no paths"
   (x : xs) -> x :| xs
 
-seGetRoots :: StoreEnv s a -> NonEmpty (StorePath s (StoreName s) a)
+seGetRoots :: StoreEnv a -> NonEmpty (StorePath StoreName a)
 seGetRoots env@StoreEnv {seRoots} =
   fmap (seLookup env) seRoots
 
 seFetchRefs ::
-  StoreEnv s a ->
-  (StoreName s -> Bool) ->
-  NonEmpty (StoreName s) ->
-  [StorePath s (StoreName s) a]
+  StoreEnv a ->
+  (StoreName -> Bool) ->
+  NonEmpty StoreName ->
+  [StorePath StoreName a]
 seFetchRefs env predicate =
   fst
     . foldl'
@@ -305,10 +312,10 @@ seFetchRefs env predicate =
                 spRefs
 
 seBottomUp ::
-  forall s a b.
-  (StorePath s (StorePath s (StoreName s) b) a -> b) ->
-  StoreEnv s a ->
-  StoreEnv s b
+  forall a b.
+  (StorePath (StorePath StoreName b) a -> b) ->
+  StoreEnv a ->
+  StoreEnv b
 seBottomUp f StoreEnv {sePaths, seRoots} =
   StoreEnv
     { sePaths = snd $ execState (mapM_ go seRoots) (sePaths, HM.empty),
@@ -320,12 +327,12 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
         (error $ "invariant violation: name doesn't exists: " <> show k)
         (HM.lookup k m)
     go ::
-      StoreName s ->
+      StoreName ->
       State
-        ( HashMap (StoreName s) (StorePath s (StoreName s) a),
-          HashMap (StoreName s) (StorePath s (StoreName s) b)
+        ( HashMap StoreName (StorePath StoreName a),
+          HashMap StoreName (StorePath StoreName b)
         )
-        (StorePath s (StoreName s) b)
+        (StorePath StoreName b)
     go name = do
       processed <- gets snd
       case name `HM.lookup` processed of
@@ -339,7 +346,7 @@ seBottomUp f StoreEnv {sePaths, seRoots} =
 
 --------------------------------------------------------------------------------
 
-storeEnvToDot :: StoreEnv s a -> Text
+storeEnvToDot :: StoreEnv a -> Text
 storeEnvToDot env =
   seBottomUp go env
     & seGetRoots
@@ -352,7 +359,7 @@ storeEnvToDot env =
       fromList [Set.singleton (spName sp, spName ref) <> spPayload ref | ref <- spRefs sp]
         & mconcat
 
-    render :: Set (StoreName s, StoreName s) -> Text
+    render :: Set (StoreName, StoreName) -> Text
     render edges =
       Dot.DotGraph
         Dot.Strict
@@ -367,7 +374,7 @@ storeEnvToDot env =
         ]
         & Dot.encode
 
-    mkNodeId :: StoreName s -> Dot.NodeId
+    mkNodeId :: StoreName -> Dot.NodeId
     mkNodeId = fromString . toString . storeNameToShortText
 
 --------------------------------------------------------------------------------
