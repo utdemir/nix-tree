@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased:
+
+* feat: Disambiguate store paths with the same name (thanks @lf-, issue: [#119])
+
 ## 0.6.2 - 2025-02-25:
 
 * fix: Fix a failure when the store path does not have a signature. (thanks @minhtrancccp, issue [#114])
