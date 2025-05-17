@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased:
+## 0.6.3 - 2025-05-18:
 
 * feat: Disambiguate store paths with the same name (thanks @lf-, issue: [#119])
 
