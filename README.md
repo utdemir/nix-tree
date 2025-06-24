@@ -1,6 +1,6 @@
 # nix-tree
 
-![Build Status](https://github.com/utdemir/nix-tree/workflows/nix-build/badge.svg)
+[![Build Status](https://github.com/utdemir/nix-tree/actions/workflows/build.yaml/badge.svg)](https://github.com/utdemir/nix-tree/actions/workflows/build.yaml)
 [![Packaging status](https://repology.org/badge/vertical-allrepos/haskell:nix-tree.svg?exclude_unsupported=1)](https://repology.org/project/haskell:nix-tree/versions)
 
 Interactively browse dependency graphs of Nix derivations.
