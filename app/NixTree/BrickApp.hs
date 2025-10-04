@@ -1,4 +1,4 @@
-module NixTree.App (run, helpText) where
+module NixTree.BrickApp (run, helpText) where
 
 import qualified Brick as B
 import qualified Brick.BChan as B
@@ -6,7 +6,6 @@ import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as B
 import qualified Brick.Widgets.List as B
 import Control.Concurrent
-import Data.InvertedIndex
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Sequence as S
@@ -15,6 +14,7 @@ import qualified Data.Text as T
 import qualified Graphics.Vty as V
 import Lens.Micro (Traversal', _Just)
 import qualified NixTree.Clipboard as Clipboard
+import NixTree.Data.InvertedIndex
 import NixTree.PathStats
 import qualified System.Clock as Clock
 import qualified System.HrfSize as HRF
