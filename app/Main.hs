@@ -4,7 +4,7 @@ module Main where
 
 import Control.Concurrent.Async
 import Control.Exception (evaluate)
-import NixTree.App
+import NixTree.BrickApp
 import NixTree.PathStats
 import qualified Options.Applicative as Opts
 import qualified Options.Applicative.Help.Pretty as Opts

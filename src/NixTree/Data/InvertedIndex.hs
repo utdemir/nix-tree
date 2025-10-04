@@ -1,4 +1,4 @@
-module Data.InvertedIndex
+module NixTree.Data.InvertedIndex
   ( InvertedIndex,
     iiFromList,
     iiInsert,

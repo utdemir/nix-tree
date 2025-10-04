@@ -1,13 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Test.Data.InvertedIndex (tests) where
+module Test.NixTree.Data.InvertedIndex (tests) where
 
-import Data.InvertedIndex
 import qualified Data.Map as Map
 import qualified Data.Text as Text
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
+import NixTree.Data.InvertedIndex
 
 prop_inverted_index :: Property
 prop_inverted_index = withDiscards 10000 . withTests 10000 . property $ do

@@ -4,9 +4,9 @@ module Main where
 
 import Hedgehog
 import Hedgehog.Main
-import qualified Test.Data.InvertedIndex
+import qualified Test.NixTree.Data.InvertedIndex
 
 main :: IO ()
 main =
   defaultMain . map checkParallel $
-    [Test.Data.InvertedIndex.tests]
+    [Test.NixTree.Data.InvertedIndex.tests]

@@ -38,11 +38,6 @@ common common-options
                       NumericUnderscores
                       MultiWayIf
                       TemplateHaskell
-  other-modules:      NixTree.PathStats
-                      NixTree.StorePath
-                      NixTree.App
-                      Data.InvertedIndex
-                      NixTree.Clipboard
   mixins:             base hiding (Prelude)
                     , relude (Relude as Prelude)
   build-depends:      base
@@ -63,21 +58,32 @@ common common-options
                     , microlens
                     , dot
 
+library
+  import:             common-options
+  hs-source-dirs:     src
+  exposed-modules:    NixTree.PathStats
+                      NixTree.StorePath
+                      NixTree.Data.InvertedIndex
+
 executable nix-tree
   import:             common-options
   ghc-options:        -Wunused-packages -threaded -with-rtsopts=-N
-  main-is:            NixTree/Main.hs
-  hs-source-dirs:     src
+  main-is:            Main.hs
+  hs-source-dirs:     app
+  other-modules:      NixTree.BrickApp
+                      NixTree.Clipboard
   default-language:   Haskell2010
   build-depends:      base >= 4.11 && < 5
                     , terminal-progress-bar
                     , async
+                    , nix-tree
 
 test-suite nix-tree-tests
   import:           common-options
   type:             exitcode-stdio-1.0
   hs-source-dirs:   test/ src/
-  other-modules:    Test.Data.InvertedIndex
+  other-modules:    Test.NixTree.Data.InvertedIndex
   main-is:          Test.hs
   build-depends:    base >=4.11 && < 5
                   , hedgehog
+                  , nix-tree
