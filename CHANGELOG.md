@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0 - 2025-10-13:
+
+* feat: Now available as a Haskell library (thanks @MangoIV (issue: [#84]), @blackheaven (PR: [#129]))
+
+[#84]: https://github.com/utdemir/nix-tree/issues/84
+[#129]: https://github.com/utdemir/nix-tree/pull/129
+
 ## 0.6.3 - 2025-05-18:
 
 * feat: Disambiguate store paths with the same name (thanks @lf-, issue: [#119])
@@ -9,7 +16,7 @@
 * fix: Fix a failure when the store path does not have a signature. (thanks @minhtrancccp, issue [#114])
 * chore: Update flake description to remove deprecated 'defaultPackage' field (thanks @minhtrancccp, issue [#113])
 
-#[113]: https://github.com/utdemir/nix-tree/issues/113
+[#113]: https://github.com/utdemir/nix-tree/issues/113
 [#114]: https://github.com/utdemir/nix-tree/issues/114
 
 ## 0.6.1 - 2025-01-25:
