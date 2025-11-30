@@ -12,7 +12,7 @@ import qualified Data.Sequence as S
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Graphics.Vty as V
-import Lens.Micro (Traversal', _Just)
+import Lens.Micro (Traversal', _1, _Just, (^.))
 import qualified NixTree.Clipboard as Clipboard
 import NixTree.Data.InvertedIndex
 import NixTree.PathStats
@@ -258,6 +258,12 @@ app =
           (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
             | k `elem` [V.KChar 'l', V.KRight] ->
                 B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) 1
+          (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends _))
+            | k == V.KHome ->
+                B.hScrollToBeginning (B.viewportScroll WidgetWhyDependsViewport)
+          (B.VtyEvent (V.EvKey k []), Just (ModalWhyDepends l))
+            | k == V.KEnd ->
+                scrollToSelectedLineEnd l
           (B.VtyEvent (V.EvKey V.KPageUp []), Just (ModalWhyDepends _)) ->
             B.zoom (aeOpenModalL . _Just . _ModalWhyDepends) B.listMovePageUp
           (B.VtyEvent (V.EvKey V.KPageDown []), Just (ModalWhyDepends _)) ->
@@ -448,12 +454,35 @@ renderWhyDependsModal l =
     & renderModal "why-depends"
   where
     renderDepends _ =
-      B.txt . pathsToText
-    pathsToText xs =
-      xs
-        & NE.toList
-        & fmap (storeNameToShortText . spName)
-        & T.intercalate " → "
+      B.txt . whyDependsPathToText
+
+whyDependsPathToText :: NonEmpty Path -> Text
+whyDependsPathToText xs =
+  xs
+    & NE.toList
+    & fmap (storeNameToShortText . spName)
+    & T.intercalate " → "
+
+{- We could use 'B.hScrollToEnd', but it jumps too much when some lines are longer than others.
+This is more fine grained in that it jumps only to the end of the currently selected line.
+-}
+scrollToSelectedLineEnd ::
+  B.GenericList Widgets Seq (NonEmpty Path) ->
+  B.EventM Widgets (AppEnv s) ()
+scrollToSelectedLineEnd l = do
+  mViewport <- B.lookupViewport WidgetWhyDependsViewport
+  case (mViewport, B.listSelectedElement l) of
+    (Just vp, Just (_, selectedPath')) -> do
+      let textWidth = B.textWidth (whyDependsPathToText selectedPath')
+          viewportWidth = vp ^. B.vpSize . _1
+          currentScroll = vp ^. B.vpLeft
+          -- Calculate the scroll position needed to right-align the selected line
+          -- We want: scrollPos + viewportWidth >= textWidth
+          -- So: scrollPos = textWidth - viewportWidth (but not less than 0)
+          targetScroll = max 0 (textWidth - viewportWidth)
+          scrollDelta = targetScroll - currentScroll
+      B.hScrollBy (B.viewportScroll WidgetWhyDependsViewport) scrollDelta
+    _ -> pass
 
 showWhyDepends :: AppEnv s -> AppEnv s
 showWhyDepends env@AppEnv {aeActualStoreEnv} =
