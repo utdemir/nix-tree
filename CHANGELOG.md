@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* feat: support jumping to beginning/end of line (Home/End keys) in why-depends modal
+
 ## 0.7.0 - 2025-10-13:
 
 * feat: Now available as a Haskell library (thanks @MangoIV (issue: [#84]), @blackheaven (PR: [#129]))
@@ -60,7 +64,7 @@
 
 ## 0.3.3 - 2024-01-17:
 
-* chore: Update 'brick' & 'optparse-applicative' library to work with the newer Stackage snapshot (thanks @ncfavier, PR: [#78][]) 
+* chore: Update 'brick' & 'optparse-applicative' library to work with the newer Stackage snapshot (thanks @ncfavier, PR: [#78][])
 
 [#78]: https://github.com/utdemir/nix-tree/issues/78
 
@@ -73,14 +77,14 @@
 
 ## 0.3.1 - 2022-12-10:
 
-* fix: Update 'brick' library (thanks @ncfavier, PR: [#47][]) 
+* fix: Update 'brick' library (thanks @ncfavier, PR: [#47][])
 
 [#47]: https://github.com/utdemir/nix-tree/issues/47
 
 ## 0.3.0 - 2022-11-26:
 
 * feat: Improved help text.
-* feat: Allow passing '--impure' flag to Nix (issue: [#40][]) 
+* feat: Allow passing '--impure' flag to Nix (issue: [#40][])
 * fix: Use -O1 instead of -O2 to save on compile times.
 
 [#40]: https://github.com/utdemir/nix-tree/issues/40
