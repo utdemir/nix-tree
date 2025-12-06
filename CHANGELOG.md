@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 - 2025-12-06:
 
-* feat: support jumping to beginning/end of line (Home/End keys) in why-depends modal
+* feat: support jumping to beginning/end of line (Home/End keys) in why-depends modal (thanks @jhrcek
+, PR [#132]))
+
+[#132]: https://github.com/utdemir/nix-tree/pull/132
 
 ## 0.7.0 - 2025-10-13:
 
