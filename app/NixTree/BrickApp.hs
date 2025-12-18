@@ -408,7 +408,7 @@ renderInfoPane env =
                 "Immediate Parents ("
                   <> T.pack (show $ length immediateParents)
                   <> "): "
-                  <> T.intercalate ", " (map storeNameToShortText immediateParents)
+                  <> T.intercalate ", " (sortOn T.toLower $ map storeNameToShortText immediateParents)
         ]
   where
     underlineWhen so =
