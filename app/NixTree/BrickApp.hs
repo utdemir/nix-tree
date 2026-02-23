@@ -203,6 +203,9 @@ app =
       B.appHandleEvent = \e -> do
         s <- get
         case (e, aeOpenModal s) of
+          -- quit
+          (B.VtyEvent (V.EvKey (V.KChar 'c') [V.MCtrl]), _) ->
+            B.halt
           -- main screen
           (B.VtyEvent (V.EvKey k []), Nothing)
             | k `elem` [V.KChar 'q', V.KEsc] ->
